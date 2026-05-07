@@ -80,6 +80,9 @@ export async function mergeExtractions(
     system: MERGE_SYSTEM,
     prompt: buildMergePrompt(name, extractions),
     temperature: opts.temperature ?? 0.3,
+    // The merged persona JSON is larger than a single extraction (more
+    // examples, deduplicated vocabulary, etc.) but still well under 6k tokens.
+    maxOutputTokens: 8000,
   });
 
   return object;

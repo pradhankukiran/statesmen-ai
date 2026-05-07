@@ -148,6 +148,9 @@ export async function POST(request: Request): Promise<Response> {
     system,
     messages: modelMessages,
     temperature: 0.7,
+    // Match the persona's "chamber response — focused and punchy, not essays"
+    // behaviour spec. Also keeps Groq token usage predictable for free tier.
+    maxOutputTokens: 1500,
   });
 
   return result.toUIMessageStreamResponse();

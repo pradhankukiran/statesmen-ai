@@ -71,6 +71,10 @@ export async function extractStyleFromChunk(
     system: EXTRACT_SYSTEM,
     prompt: buildExtractPrompt(personName, chunkText),
     temperature: opts.temperature ?? 0.2,
+    // The structured extraction JSON typically lands at 1.5–2.5k tokens.
+    // OpenRouter pre-charges for the cap, so leave headroom but don't ask
+    // for the model's full ceiling — that blocks budget-limited accounts.
+    maxOutputTokens: 4000,
   });
 
   return object;
