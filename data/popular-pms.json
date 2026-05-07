@@ -7,7 +7,7 @@
     "house": "Commons",
     "term": "2019–2022",
     "tagline": "Brexit-era PM",
-    "photoUrl": "https://members-api.parliament.uk/api/Members/1423/Portrait?cropType=ThreeFour"
+    "photoUrl": "https://members-api.parliament.uk/api/Members/1423/Thumbnail"
   },
   {
     "id": 4514,
@@ -17,7 +17,7 @@
     "house": "Commons",
     "term": "2024–",
     "tagline": "Current PM",
-    "photoUrl": "https://members-api.parliament.uk/api/Members/4514/Portrait?cropType=ThreeFour"
+    "photoUrl": "https://members-api.parliament.uk/api/Members/4514/Thumbnail"
   },
   {
     "id": 4483,
@@ -27,7 +27,7 @@
     "house": "Commons",
     "term": "2022–2024",
     "tagline": "Banker turned PM",
-    "photoUrl": "https://members-api.parliament.uk/api/Members/4483/Portrait?cropType=ThreeFour"
+    "photoUrl": "https://members-api.parliament.uk/api/Members/4483/Thumbnail"
   },
   {
     "id": 4097,
@@ -37,7 +37,7 @@
     "house": "Commons",
     "term": "2022",
     "tagline": "49-day premiership",
-    "photoUrl": "https://members-api.parliament.uk/api/Members/4097/Portrait?cropType=ThreeFour"
+    "photoUrl": "https://members-api.parliament.uk/api/Members/4097/Thumbnail"
   },
   {
     "id": 1467,
@@ -47,6 +47,6 @@
     "house": "Commons",
     "term": "2016–2019",
     "tagline": "Brexit PM",
-    "photoUrl": "https://members-api.parliament.uk/api/Members/1467/Portrait?cropType=ThreeFour"
+    "photoUrl": "https://members-api.parliament.uk/api/Members/1467/Thumbnail"
   }
 ]

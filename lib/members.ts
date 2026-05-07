@@ -64,7 +64,10 @@ function houseToCode(house: House): "1" | "2" {
 }
 
 export function getMemberPhotoUrl(id: number): string {
-  return `${BASE}/Members/${id}/Portrait?cropType=ThreeFour`;
+  // The /Portrait endpoint 404s for almost every member regardless of cropType.
+  // /Thumbnail is the endpoint the Members API itself returns in `thumbnailUrl`
+  // and is reliably 200 for both current MPs and historic peers.
+  return `${BASE}/Members/${id}/Thumbnail`;
 }
 
 function toMember(v: z.infer<typeof MemberValueSchema>): Member {

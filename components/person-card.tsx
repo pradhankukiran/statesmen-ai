@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { getMemberPhotoUrl } from "@/lib/members";
 
 export type PersonCardProps = {
   id: number;
@@ -17,10 +18,6 @@ export type PersonCardProps = {
   photoUrl?: string | null;
   className?: string;
 };
-
-function getMemberPhotoUrl(id: number): string {
-  return `https://members-api.parliament.uk/api/Members/${id}/Portrait?cropType=ThreeFour`;
-}
 
 function yearOf(iso: string | null | undefined): string | null {
   if (!iso) return null;
