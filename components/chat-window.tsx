@@ -411,6 +411,10 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
               // Brand-yellow only appears in the focus ring — neutral at rest.
               "focus-visible:border-foreground focus-visible:ring-3 focus-visible:ring-brand/50",
               "disabled:cursor-not-allowed disabled:opacity-60",
+              // Hide the OS scrollbar. The textarea still scrolls via keyboard
+              // and touch; we just don't want Chromium's up-arrow / thumb /
+              // down-arrow chrome cluttering the right edge of the input.
+              "[&::-webkit-scrollbar]:hidden [scrollbar-width:none]",
             )}
             style={{ maxHeight: 220 }}
           />
