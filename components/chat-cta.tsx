@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, MessageSquare } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { slugify } from "@/lib/slug";
 
 type StatusResponse =
@@ -16,6 +16,16 @@ type Props = {
   id: number;
   name: string;
 };
+
+// ─── ChatCta ──────────────────────────────────────────────────────────────────
+//
+// The page's anchor action. Hand-rolled brutalist primary button — flat brand
+// yellow, heavy black border, sharp corners, big confident type. Sits at the
+// same visual weight as the chat composer's send-state and the landing-page
+// "highlight" pill.
+//
+// Loading copy stays as "Checking…" but renders in the same big type as the
+// resting state so the button doesn't shrink/wobble between states.
 
 export function ChatCta({ id, name }: Props) {
   const router = useRouter();
@@ -70,27 +80,42 @@ export function ChatCta({ id, name }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-start gap-2">
-      <Button
-        size="lg"
+    <div className="flex flex-col items-start gap-3">
+      <button
+        type="button"
         onClick={handleClick}
         disabled={isBusy}
-        className="bg-brand text-brand-foreground hover:bg-brand/90"
+        aria-busy={isBusy || undefined}
+        className={cn(
+          // Brutalist primary: flat brand-yellow fill, heavy black border,
+          // sharp rounded-md corners, oversized confident type.
+          "inline-flex items-center gap-3 rounded-md border-2 border-foreground bg-brand px-6 py-3 text-base font-semibold text-brand-foreground sm:px-8 sm:py-4 sm:text-lg",
+          // Tactile press: yellow darkens slightly on hover, button drops
+          // 1px on click. No shadow, no soft transition — just edges.
+          "transition-colors hover:bg-brand/85 active:translate-y-px",
+          // Brand yellow stays in the focus ring so the affordance reads
+          // even on darker backgrounds.
+          "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand",
+          "disabled:cursor-not-allowed disabled:opacity-60",
+        )}
       >
         {isBusy ? (
           <>
-            <Loader2 className="size-4 animate-spin" aria-hidden />
+            <Loader2 className="size-5 animate-spin" aria-hidden />
             Checking…
           </>
         ) : (
           <>
-            <MessageSquare className="size-4" aria-hidden />
+            <MessageSquare className="size-5" aria-hidden />
             Chat with {name}
           </>
         )}
-      </Button>
+      </button>
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p
+          role="alert"
+          className="rounded-md border-2 border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+        >
           {error}
         </p>
       ) : null}

@@ -1,55 +1,56 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+
+// ─── ProfileLoading ───────────────────────────────────────────────────────────
+//
+// Mirrors the profile page layout exactly so there's no surprise reflow when
+// the data lands: hero band (yellow pill placeholder, oversized name line,
+// small accent line), then the two-column photo/info split. Same paddings,
+// same grid template, same border weights.
 
 export default function ProfileLoading() {
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-12 sm:py-16">
-      <Card size="default" className="overflow-hidden">
-        <div className="grid gap-0 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-          {/* Photo column. */}
-          <div className="bg-muted/40">
-            <Skeleton className="aspect-[3/4] w-full rounded-none" />
+    <div className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-24">
+      {/* ─ Hero band placeholder ────────────────────────────────────────── */}
+      <header className="flex flex-col items-start">
+        {/* Yellow pill placeholder — same flat box as the resting pill so the
+           accent doesn't pop in. */}
+        <span
+          aria-hidden
+          className="mb-8 inline-block h-[1.625rem] w-44 bg-brand"
+        />
+        {/* Hero-sized name line: matches text-5xl/6xl height. */}
+        <Skeleton className="h-12 w-3/4 rounded-md sm:h-16 sm:w-2/3" />
+        {/* Small uppercase accent line. */}
+        <Skeleton className="mt-4 h-3 w-56 rounded-md" />
+      </header>
+
+      {/* ─ Photo + info split ───────────────────────────────────────────── */}
+      <section className="mt-12 grid gap-10 sm:mt-16 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:gap-12">
+        {/* Photo frame — 3:4, same border treatment as the real one so the
+           edge weight matches before/after load. */}
+        <div className="max-w-sm">
+          <Skeleton className="aspect-[3/4] w-full rounded-md border-2 border-foreground" />
+        </div>
+
+        {/* Info column. */}
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-5 w-full max-w-xl rounded-md sm:h-6" />
+            <Skeleton className="h-5 w-11/12 max-w-xl rounded-md sm:h-6" />
+            <Skeleton className="h-5 w-3/4 max-w-xl rounded-md sm:h-6" />
           </div>
 
-          {/* Info column. */}
-          <CardContent className="flex flex-col gap-6 p-6 sm:p-8">
-            <header className="flex flex-col gap-2">
-              <Skeleton className="h-9 w-3/4 sm:h-10" />
-              <Skeleton className="h-5 w-2/5" />
-            </header>
+          {/* CTA placeholder — same flat brand-yellow as the real button so
+             the focus moment isn't disrupted by a grey bar morphing into a
+             yellow one. */}
+          <span
+            aria-hidden
+            className="inline-block h-[3.125rem] w-64 rounded-md border-2 border-foreground bg-brand sm:h-[3.625rem]"
+          />
 
-            <dl className="flex flex-col gap-3 text-sm">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-3 w-16" />
-                <div className="flex items-center gap-2">
-                  <Skeleton className="size-3 rounded-full" />
-                  <Skeleton className="h-4 w-28" />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-4 w-32" />
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-4 w-24" />
-              </div>
-            </dl>
-
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-11/12" />
-              <Skeleton className="h-4 w-3/4" />
-            </div>
-
-            <div className="mt-auto pt-2">
-              <Skeleton className="h-9 w-44" />
-            </div>
-          </CardContent>
+          <Skeleton className="h-3 w-72 rounded-md" />
         </div>
-      </Card>
+      </section>
     </div>
   );
 }
