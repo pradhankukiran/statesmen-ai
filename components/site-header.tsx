@@ -15,7 +15,7 @@ export function SiteHeader() {
           <span className="text-lg">Statesmen AI</span>
         </Link>
         <nav className="hidden text-xs uppercase tracking-widest text-muted-foreground sm:block">
-          Hansard-grounded · AI parody
+          Hansard-grounded · AI personas
         </nav>
       </div>
     </header>

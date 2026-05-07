@@ -17,7 +17,7 @@ export default function Home() {
 
       <p className="mt-8 max-w-2xl text-lg text-muted-foreground sm:text-xl">
         Pick a Prime Minister, MP, or Lord — past or present — and have a
-        conversation with an AI parody built from their real recorded
+        conversation with an AI persona built from their real recorded
         speeches.
       </p>
 

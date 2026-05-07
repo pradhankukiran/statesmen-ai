@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Statesmen AI — Chat with British political figures",
   description:
-    "Chat with AI parodies of British Prime Ministers, MPs, and Lords past and present, grounded in real Hansard speeches.",
+    "Chat with AI personas of British Prime Ministers, MPs, and Lords past and present, grounded in real Hansard speeches.",
 };
 
 export default function RootLayout({

@@ -1,6 +1,6 @@
 # Statesmen AI — Project Plan
 
-> An app to chat with AI parodies of British political figures, generated on demand from real Hansard speeches.
+> An app to chat with AI personas of British political figures, generated on demand from real Hansard speeches.
 
 ## 1. Vision
 
@@ -241,7 +241,7 @@ Each phase ends with a working state and at least one commit. No phase is merged
 
 ### Phase 10 — Chat page
 - `app/chat/[slug]/page.tsx`: shadcn chat shell using `useChat()` from `ai/react`
-- Header with persona photo + name + parody disclaimer
+- Header with persona photo + name + AI-persona disclaimer
 - 3 suggested starters per persona (template-generated)
 - Markdown rendering of assistant messages
 - **Deliverable:** working end-to-end conversation.
@@ -285,7 +285,7 @@ Each phase ends with a working state and at least one commit. No phase is merged
 | LLM returns malformed JSON | Zod validate, retry once with stricter prompt, fail with friendly error |
 | Hallucinated "verbatim" quotes | Extraction prompt enforces verbatim only; later: validate quotes exist in source corpus |
 | Costs spiral | OpenRouter spend cap; log every build with token counts |
-| Legal — impersonation | Footer + chat-header disclaimer ("AI parody, not actual statements"); never auto-publish |
+| Legal — impersonation | Footer + chat-header disclaimer ("AI persona, not actual statements"); never auto-publish |
 | Many MPs have thin corpora | Refuse to build below the threshold; surface that in the UI |
 
 ## 8. Out of scope
