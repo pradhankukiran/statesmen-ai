@@ -1,43 +1,114 @@
 /**
- * Centralised LLM model identifiers.
+ * Centralised LLM model identifiers and fallback lists.
  *
  * IMPORTANT: these are functions, not constants. Module-level constants
- * capture `process.env` at import time, which is wrong in two ways:
- *   - Next.js dev "Reload env" doesn't re-evaluate already-loaded modules,
- *     so changes to `.env.local` are silently ignored.
- *   - CLI scripts that call `process.loadEnvFile()` after imports load
- *     the env *after* the constants were already captured.
- * Reading env at call time (per-request) avoids both traps.
+ * capture `process.env` at import time, which silently breaks both
+ * Next.js dev "Reload env" (the module is already loaded) and CLI scripts
+ * that call `process.loadEnvFile()` after imports. Reading env at call
+ * time avoids both traps.
  *
- * Override priority for OpenRouter (highest first):
+ * ─── OpenRouter overrides (highest priority first) ────────────────────────────
  *
- *   1. OPENROUTER_EXTRACT_MODEL / OPENROUTER_MERGE_MODEL  (per-stage)
- *   2. OPENROUTER_MODEL                                   (master — both stages)
- *   3. baked-in default                                   (claude-sonnet-4.5)
+ *   1. OPENROUTER_EXTRACT_MODELS / OPENROUTER_MERGE_MODELS  (per-stage list)
+ *   2. OPENROUTER_EXTRACT_MODEL  / OPENROUTER_MERGE_MODEL   (per-stage single)
+ *   3. OPENROUTER_MODELS                                    (master list)
+ *   4. OPENROUTER_MODEL                                     (master single)
+ *   5. baked-in default                                     (claude-sonnet-4.5)
  *
- * Simple "use one model for everything":
+ * Lists are comma-separated. The pipeline tries each model in order; if a
+ * call fails with a transient/rate-limit error, the next model is tried.
  *
- *   OPENROUTER_MODEL=nvidia/nemotron-3-super-120b-a12b:free
+ *   OPENROUTER_MODELS=nvidia/nemotron-3-super-120b-a12b:free,qwen/qwen3-next-80b-a3b-instruct:free,nvidia/nemotron-nano-9b-v2:free
  */
 
 const OPENROUTER_DEFAULT = "anthropic/claude-sonnet-4.5";
 const GROQ_DEFAULT = "llama-3.3-70b-versatile";
 
-function openrouterFallback(): string {
-  return process.env.OPENROUTER_MODEL ?? OPENROUTER_DEFAULT;
+function parseList(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 }
 
-// Per-chunk style extraction (offline, quality-sensitive).
+function openrouterMasterList(): string[] {
+  const list = parseList(process.env.OPENROUTER_MODELS);
+  if (list.length > 0) return list;
+  const single = process.env.OPENROUTER_MODEL;
+  if (single && single.trim().length > 0) return [single.trim()];
+  return [OPENROUTER_DEFAULT];
+}
+
+// Per-chunk style extraction (offline, quality-sensitive). Returns an
+// ordered fallback list — first entry is preferred, later entries are
+// tried only if earlier ones return transient/rate-limit errors.
+export function extractModels(): string[] {
+  const list = parseList(process.env.OPENROUTER_EXTRACT_MODELS);
+  if (list.length > 0) return list;
+  const single = process.env.OPENROUTER_EXTRACT_MODEL;
+  if (single && single.trim().length > 0) return [single.trim()];
+  return openrouterMasterList();
+}
+
+// Reduce N chunk extractions to one consolidated persona. Same fallback
+// semantics as extractModels.
+export function mergeModels(): string[] {
+  const list = parseList(process.env.OPENROUTER_MERGE_MODELS);
+  if (list.length > 0) return list;
+  const single = process.env.OPENROUTER_MERGE_MODEL;
+  if (single && single.trim().length > 0) return [single.trim()];
+  return openrouterMasterList();
+}
+
+// Single-model convenience for callers that don't want to think about
+// fallback (chat, simple scripts).
 export function extractModel(): string {
-  return process.env.OPENROUTER_EXTRACT_MODEL ?? openrouterFallback();
+  return extractModels()[0]!;
 }
 
-// Reduce N chunk extractions to one consolidated persona.
 export function mergeModel(): string {
-  return process.env.OPENROUTER_MERGE_MODEL ?? openrouterFallback();
+  return mergeModels()[0]!;
 }
 
-// Realtime chat with the persona (latency-sensitive).
+// Realtime chat with the persona (latency-sensitive). Single model only —
+// streaming chat can't transparently fail over mid-response.
 export function chatModel(): string {
   return process.env.GROQ_CHAT_MODEL ?? GROQ_DEFAULT;
+}
+
+// ─── Failure classification ───────────────────────────────────────────────────
+
+/**
+ * Whether an LLM error is worth retrying against the next model in the
+ * fallback list. Conservative: anything that looks like rate-limiting,
+ * upstream provider failure, or a transient backend issue qualifies.
+ * Schema/validation errors do NOT — those repeat regardless of model.
+ */
+export function isFallbackableError(err: unknown): boolean {
+  if (err === null || typeof err !== "object") return false;
+
+  const e = err as { statusCode?: unknown; message?: unknown; name?: unknown };
+
+  if (typeof e.statusCode === "number") {
+    if (e.statusCode === 402) return true; // out of credits — try cheaper/free model
+    if (e.statusCode === 408) return true; // request timeout
+    if (e.statusCode === 429) return true; // rate limited
+    if (e.statusCode >= 500 && e.statusCode < 600) return true; // backend
+  }
+
+  const message =
+    typeof e.message === "string" ? e.message.toLowerCase() : "";
+  if (message.length > 0) {
+    if (message.includes("rate limit")) return true;
+    if (message.includes("rate-limited")) return true;
+    if (message.includes("provider returned error")) return true;
+    if (message.includes("temporarily")) return true;
+    if (message.includes("overloaded")) return true;
+    if (message.includes("upstream")) return true;
+    if (message.includes("no endpoints found")) return true;
+    if (message.includes("fewer max_tokens")) return true;
+  }
+
+  return false;
 }

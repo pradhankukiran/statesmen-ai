@@ -3,7 +3,7 @@ import { generateObject } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { MERGE_SYSTEM, buildMergePrompt } from "./prompts/merge";
 import type { Extraction } from "./extractor";
-import { mergeModel } from "./models";
+import { mergeModels, isFallbackableError } from "./models";
 
 // ─── Schema for the consolidated persona ──────────────────────────────────────
 
@@ -51,10 +51,37 @@ export type MergedPersona = z.infer<typeof MergedPersonaSchema>;
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export type MergeOptions = {
-  /** Override the OpenRouter model id. Default: lib/models#MERGE_MODEL. */
-  model?: string;
+  /** Override the OpenRouter model id list. Default: lib/models#mergeModels(). */
+  models?: string[];
   temperature?: number;
+  /**
+   * Where to start in the fallback list. Defaults to 0; orchestrator may
+   * rotate this so merge doesn't always hit the same model that just did
+   * extraction (and may be rate-limited).
+   */
+  startModelIndex?: number;
 };
+
+async function callOnce(
+  apiKey: string,
+  modelId: string,
+  name: string,
+  extractions: Extraction[],
+  temperature: number,
+): Promise<MergedPersona> {
+  const openrouter = createOpenRouter({ apiKey });
+  const { object } = await generateObject({
+    model: openrouter(modelId),
+    schema: MergedPersonaSchema,
+    system: MERGE_SYSTEM,
+    prompt: buildMergePrompt(name, extractions),
+    temperature,
+    // The merged persona JSON is larger than a single extraction (more
+    // examples, deduplicated vocabulary, etc.) but still well under 6k tokens.
+    maxOutputTokens: 8000,
+  });
+  return object;
+}
 
 export async function mergeExtractions(
   name: string,
@@ -71,19 +98,25 @@ export async function mergeExtractions(
     throw new Error("Cannot merge zero extractions.");
   }
 
-  const openrouter = createOpenRouter({ apiKey });
-  const modelId = opts.model ?? mergeModel();
+  const pool = opts.models && opts.models.length > 0 ? opts.models : mergeModels();
+  const start = ((opts.startModelIndex ?? 0) % pool.length + pool.length) % pool.length;
+  const ordered = [...pool.slice(start), ...pool.slice(0, start)];
+  const temperature = opts.temperature ?? 0.3;
 
-  const { object } = await generateObject({
-    model: openrouter(modelId),
-    schema: MergedPersonaSchema,
-    system: MERGE_SYSTEM,
-    prompt: buildMergePrompt(name, extractions),
-    temperature: opts.temperature ?? 0.3,
-    // The merged persona JSON is larger than a single extraction (more
-    // examples, deduplicated vocabulary, etc.) but still well under 6k tokens.
-    maxOutputTokens: 8000,
-  });
+  let lastError: unknown;
+  for (const modelId of ordered) {
+    try {
+      return await callOnce(apiKey, modelId, name, extractions, temperature);
+    } catch (err) {
+      lastError = err;
+      if (!isFallbackableError(err)) throw err;
+    }
+  }
 
-  return object;
+  throw new Error(
+    `Merge failed across all ${ordered.length} model(s) in the fallback list. ` +
+      `Last error: ${
+        lastError instanceof Error ? lastError.message : String(lastError)
+      }`,
+  );
 }

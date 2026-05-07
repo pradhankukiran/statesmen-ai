@@ -176,8 +176,10 @@ export async function buildPersona(
   const totalTokens = chunks.reduce((s, c) => s + countTokens(c), 0);
   emit({ type: "chunk_done", chunkCount: chunks.length, totalTokens });
 
-  // Parallel extraction across chunks (Claude tolerates this at the OpenRouter
-  // tier; throttle here later if rate-limit issues appear).
+  // Parallel extraction across chunks. The startModelIndex rotates each
+  // chunk's preferred model so parallel calls land on different upstream
+  // providers — important for free-tier OpenRouter where each model has
+  // its own thin RPM budget.
   const extractions = await Promise.all(
     chunks.map(async (chunk, i) => {
       emit({
@@ -185,7 +187,9 @@ export async function buildPersona(
         chunkIndex: i,
         totalChunks: chunks.length,
       });
-      const result = await extractStyleFromChunk(opts.name, chunk);
+      const result = await extractStyleFromChunk(opts.name, chunk, {
+        startModelIndex: i,
+      });
       emit({
         type: "extract_done",
         chunkIndex: i,
@@ -196,7 +200,11 @@ export async function buildPersona(
   );
 
   emit({ type: "merge_start" });
-  const merged = await mergeExtractions(opts.name, extractions);
+  // Stagger merge's first-pick model away from chunk 0's, since that
+  // model just took the most recent extraction call.
+  const merged = await mergeExtractions(opts.name, extractions, {
+    startModelIndex: chunks.length,
+  });
   emit({ type: "merge_done" });
 
   emit({ type: "render_done" });

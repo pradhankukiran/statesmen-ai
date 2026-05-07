@@ -2,7 +2,7 @@ import { z } from "zod";
 import { generateObject } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { EXTRACT_SYSTEM, buildExtractPrompt } from "./prompts/extract";
-import { extractModel } from "./models";
+import { extractModels, isFallbackableError } from "./models";
 
 // ─── Output schema (also used as AI SDK structured-output schema) ─────────────
 
@@ -44,11 +44,39 @@ export type Extraction = z.infer<typeof ExtractionSchema>;
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export type ExtractOptions = {
-  /** Override the OpenRouter model id. Default: lib/models#EXTRACT_MODEL. */
-  model?: string;
+  /** Override the OpenRouter model id list. Default: lib/models#extractModels(). */
+  models?: string[];
   /** Sampling temperature. Default 0.2 — extraction wants determinism. */
   temperature?: number;
+  /**
+   * Where to start in the fallback list (rotated, modulo length). Useful for
+   * spreading parallel chunk extractions across different models so they
+   * don't all hit the same upstream rate-limit.
+   */
+  startModelIndex?: number;
 };
+
+async function callOnce(
+  apiKey: string,
+  modelId: string,
+  personName: string,
+  chunkText: string,
+  temperature: number,
+): Promise<Extraction> {
+  const openrouter = createOpenRouter({ apiKey });
+  const { object } = await generateObject({
+    model: openrouter(modelId),
+    schema: ExtractionSchema,
+    system: EXTRACT_SYSTEM,
+    prompt: buildExtractPrompt(personName, chunkText),
+    temperature,
+    // The structured extraction JSON typically lands at 1.5–2.5k tokens.
+    // OpenRouter pre-charges for the cap, so leave headroom but don't ask
+    // for the model's full ceiling — that blocks budget-limited accounts.
+    maxOutputTokens: 4000,
+  });
+  return object;
+}
 
 export async function extractStyleFromChunk(
   personName: string,
@@ -62,20 +90,26 @@ export async function extractStyleFromChunk(
     );
   }
 
-  const openrouter = createOpenRouter({ apiKey });
-  const modelId = opts.model ?? extractModel();
+  const pool = opts.models && opts.models.length > 0 ? opts.models : extractModels();
+  const start = ((opts.startModelIndex ?? 0) % pool.length + pool.length) % pool.length;
+  const ordered = [...pool.slice(start), ...pool.slice(0, start)];
+  const temperature = opts.temperature ?? 0.2;
 
-  const { object } = await generateObject({
-    model: openrouter(modelId),
-    schema: ExtractionSchema,
-    system: EXTRACT_SYSTEM,
-    prompt: buildExtractPrompt(personName, chunkText),
-    temperature: opts.temperature ?? 0.2,
-    // The structured extraction JSON typically lands at 1.5–2.5k tokens.
-    // OpenRouter pre-charges for the cap, so leave headroom but don't ask
-    // for the model's full ceiling — that blocks budget-limited accounts.
-    maxOutputTokens: 4000,
-  });
+  let lastError: unknown;
+  for (const modelId of ordered) {
+    try {
+      return await callOnce(apiKey, modelId, personName, chunkText, temperature);
+    } catch (err) {
+      lastError = err;
+      if (!isFallbackableError(err)) throw err;
+      // try next model
+    }
+  }
 
-  return object;
+  throw new Error(
+    `Extraction failed across all ${ordered.length} model(s) in the fallback list. ` +
+      `Last error: ${
+        lastError instanceof Error ? lastError.message : String(lastError)
+      }`,
+  );
 }
