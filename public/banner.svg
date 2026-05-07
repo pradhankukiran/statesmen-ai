@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320" role="img" aria-label="Statesmen AI">
+  <rect width="1280" height="320" fill="#FAFAFA"/>
+  <rect x="0" y="0" width="1280" height="6" fill="#FACC15"/>
+  <rect x="0" y="314" width="1280" height="6" fill="#FACC15"/>
+
+  <rect x="100" y="100" width="120" height="120" fill="#FACC15" stroke="#0a0a0a" stroke-width="3"/>
+  <g transform="translate(130 130) scale(2.5)" fill="none" stroke="#0a0a0a" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="3" y1="22" x2="21" y2="22"/>
+    <line x1="6" y1="18" x2="6" y2="11"/>
+    <line x1="10" y1="18" x2="10" y2="11"/>
+    <line x1="14" y1="18" x2="14" y2="11"/>
+    <line x1="18" y1="18" x2="18" y2="11"/>
+    <polygon points="12 2 20 7 4 7"/>
+  </g>
+
+  <text x="260" y="170" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="80" font-weight="700" fill="#0a0a0a" letter-spacing="-3">STATESMEN AI</text>
+  <text x="260" y="215" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" fill="#525252">Chat with British political figures, grounded in real Hansard speeches.</text>
+  <rect x="260" y="234" width="60" height="4" fill="#FACC15"/>
+  <text x="260" y="270" font-family="ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" fill="#0a0a0a" letter-spacing="2.5">HANSARD-GROUNDED · AI PERSONAS</text>
+</svg>
