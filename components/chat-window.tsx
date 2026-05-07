@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -102,6 +103,22 @@ const markdownComponents: Components = {
     <p className="mb-2 text-base font-semibold tracking-tight">{children}</p>
   ),
 };
+
+// Memoised assistant message body. Re-renders only when the rendered text
+// changes — without this, every streaming token causes ReactMarkdown to
+// re-parse the entire message tree for every assistant bubble in the list,
+// which gets visibly laggy in long conversations.
+const AssistantMarkdown = memo(function AssistantMarkdown({
+  text,
+}: {
+  text: string;
+}) {
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+      {text}
+    </ReactMarkdown>
+  );
+});
 
 // ─── Persona avatar (used in header + next to assistant messages) ────────────
 //
@@ -305,12 +322,7 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
                       Thinking…
                     </span>
                   ) : (
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={markdownComponents}
-                    >
-                      {text}
-                    </ReactMarkdown>
+                    <AssistantMarkdown text={text} />
                   )}
                 </div>
               </li>
