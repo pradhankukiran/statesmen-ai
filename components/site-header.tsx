@@ -7,13 +7,15 @@ export function SiteHeader() {
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4">
         <Link
           href="/"
-          className="flex items-center gap-2 font-semibold tracking-tight"
+          className="group flex items-center gap-2 font-semibold tracking-tight"
         >
-          <Landmark className="size-5" aria-hidden />
+          <span className="flex size-7 items-center justify-center rounded-sm bg-brand text-brand-foreground">
+            <Landmark className="size-4" aria-hidden />
+          </span>
           <span>Statesmen AI</span>
         </Link>
-        <nav className="text-sm text-muted-foreground">
-          <span aria-hidden>Hansard-grounded · AI parody</span>
+        <nav className="hidden text-xs uppercase tracking-widest text-muted-foreground sm:block">
+          Hansard-grounded · AI parody
         </nav>
       </div>
     </header>

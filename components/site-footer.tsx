@@ -1,10 +1,11 @@
 export function SiteFooter() {
   return (
-    <footer className="border-t">
+    <footer className="border-t-4 border-brand">
       <div className="mx-auto w-full max-w-6xl px-4 py-6 text-sm text-muted-foreground">
         <p>
-          Statesmen AI is a parody. Personas are AI generations grounded in real
-          public speeches from{" "}
+          <span className="font-medium text-foreground">Statesmen AI</span> is a
+          parody. Personas are AI generations grounded in real public speeches
+          from{" "}
           <a
             href="https://hansard.parliament.uk"
             target="_blank"
@@ -13,7 +14,7 @@ export function SiteFooter() {
           >
             Hansard
           </a>{" "}
-          — but the responses are not actual statements by the people depicted.
+          — not actual statements by the people depicted.
         </p>
       </div>
     </footer>
