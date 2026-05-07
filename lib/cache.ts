@@ -17,13 +17,7 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import {
-  head,
-  list,
-  put,
-  type ListBlobResult,
-  type ListBlobResultBlob,
-} from "@vercel/blob";
+import { head, put } from "@vercel/blob";
 import {
   renderPersonaExamples,
   renderPersonaMd,
@@ -134,23 +128,6 @@ async function blobHas(pathname: string): Promise<boolean> {
   }
 }
 
-async function blobListMetaUrls(): Promise<ListBlobResultBlob[]> {
-  const out: ListBlobResultBlob[] = [];
-  let cursor: string | undefined = undefined;
-  for (;;) {
-    const page: ListBlobResult = await list({
-      prefix: BLOB_PREFIX,
-      cursor,
-      limit: 1000,
-    });
-    for (const b of page.blobs) {
-      if (b.pathname.endsWith(`.${EXTS.meta}`)) out.push(b);
-    }
-    if (!page.hasMore || !page.cursor) break;
-    cursor = page.cursor;
-  }
-  return out;
-}
 
 // ─── Filesystem backend ───────────────────────────────────────────────────────
 
@@ -268,49 +245,3 @@ export async function hasPersona(slug: string): Promise<boolean> {
   return a && b && c;
 }
 
-export async function listPersonas(): Promise<PersonaMeta[]> {
-  if (useBlob()) {
-    const entries = await blobListMetaUrls();
-    const metas = await Promise.all(
-      entries.map(async (entry) => {
-        const res = await fetch(entry.url, { cache: "no-store" });
-        if (!res.ok) return null;
-        try {
-          return JSON.parse(await res.text()) as PersonaMeta;
-        } catch {
-          return null;
-        }
-      }),
-    );
-    return metas.filter((m): m is PersonaMeta => m !== null);
-  }
-
-  let names: string[] = [];
-  try {
-    names = await fs.readdir(FS_DIR);
-  } catch (err) {
-    if (
-      err &&
-      typeof err === "object" &&
-      "code" in err &&
-      (err as { code?: string }).code === "ENOENT"
-    ) {
-      return [];
-    }
-    throw err;
-  }
-
-  const metaFiles = names.filter((n) => n.endsWith(`.${EXTS.meta}`));
-  const metas = await Promise.all(
-    metaFiles.map(async (n) => {
-      const text = await fsReadText(path.join(FS_DIR, n));
-      if (text === null) return null;
-      try {
-        return JSON.parse(text) as PersonaMeta;
-      } catch {
-        return null;
-      }
-    }),
-  );
-  return metas.filter((m): m is PersonaMeta => m !== null);
-}

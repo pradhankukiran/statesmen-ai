@@ -61,16 +61,6 @@ export function mergeModels(): string[] {
   return openrouterMasterList();
 }
 
-// Single-model convenience for callers that don't want to think about
-// fallback (chat, simple scripts).
-export function extractModel(): string {
-  return extractModels()[0]!;
-}
-
-export function mergeModel(): string {
-  return mergeModels()[0]!;
-}
-
 // Realtime chat with the persona (latency-sensitive). Single model only —
 // streaming chat can't transparently fail over mid-response.
 export function chatModel(): string {
