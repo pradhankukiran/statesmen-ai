@@ -261,7 +261,7 @@ Each phase ends with a working state and at least one commit. No phase is merged
 - Optional: custom domain
 - **Deliverable:** live production URL.
 
-## 6. Key design decisions (locked-in for v1)
+## 6. Key design decisions
 
 | Topic | Decision |
 |---|---|
@@ -270,11 +270,11 @@ Each phase ends with a working state and at least one commit. No phase is merged
 | LLM split | OpenRouter (Claude) for extraction; Groq (Llama 70B) for chat. |
 | Cache backend | Vercel Blob in prod; `data/personas/` filesystem in dev. |
 | Thin-data threshold | If <30 verified contributions, refuse to build with a friendly message. |
-| Concurrency | Out of scope for v1. (No concurrency lock; double-build is acceptable cost early on.) |
-| Rate limiting | Out of scope for v1. |
-| Analytics | Out of scope for v1. |
-| User accounts | Out of scope for v1. |
-| Compare mode | Out of scope for v1. |
+| Concurrency | Out of scope. (No lock; double-build is acceptable cost.) |
+| Rate limiting | Out of scope. |
+| Analytics | Out of scope. |
+| User accounts | Out of scope. |
+| Compare mode | Out of scope. |
 
 ## 7. Risks & mitigations
 
@@ -288,7 +288,7 @@ Each phase ends with a working state and at least one commit. No phase is merged
 | Legal — impersonation | Footer + chat-header disclaimer ("AI parody, not actual statements"); never auto-publish |
 | Many MPs have thin corpora | Refuse to build below the threshold; surface that in the UI |
 
-## 8. Out of scope (v1)
+## 8. Out of scope
 
 - User accounts and chat history persistence
 - Compare-mode (multi-persona side-by-side answers)
@@ -302,7 +302,7 @@ Each phase ends with a working state and at least one commit. No phase is merged
 ## 9. Conventions
 
 - **Commits:** small, conventional-commits style (`feat:`, `chore:`, `fix:`, `docs:`, `refactor:`).
-- **Branch:** `main`. No feature branches in v1; phase commits land directly.
+- **Branch:** `main`. No feature branches; phase commits land directly.
 - **Code style:** Next.js + TS defaults, Prettier auto-format.
 - **Naming:** persona slugs are kebab-case full names (`margaret-thatcher`, `tony-blair`).
 - **Env:** all secrets via `.env.local` (gitignored); `.env.example` checked in for reference.
