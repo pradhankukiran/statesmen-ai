@@ -11,8 +11,11 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@openrouter/ai-sdk-provider": "^2.9.0",
+    "ai": "^6.0.175",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "js-tiktoken": "^1.0.21",
     "lucide-react": "^1.14.0",
     "next": "16.2.5",
     "react": "19.2.4",
