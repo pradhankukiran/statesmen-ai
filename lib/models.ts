@@ -108,6 +108,24 @@ export function isFallbackableError(err: unknown): boolean {
     if (message.includes("upstream")) return true;
     if (message.includes("no endpoints found")) return true;
     if (message.includes("fewer max_tokens")) return true;
+    // The AI SDK throws "No object generated: could not parse the response."
+    // when a model returns structured output that fails Zod validation
+    // (truncated JSON, mixed-in reasoning text, etc.). Different models
+    // have different structured-output reliability, so worth trying the
+    // next one.
+    if (message.includes("no object generated")) return true;
+    if (message.includes("could not parse the response")) return true;
+  }
+
+  // The AI SDK marks specific error classes via Symbol(vercel.ai.error).
+  // We can also detect by name string.
+  if (typeof e.name === "string") {
+    if (e.name === "AI_NoObjectGeneratedError") return true;
+    if (e.name === "AI_RetryError") return true;
+    if (e.name === "AI_APICallError" && (e.statusCode === undefined || e.statusCode === 0)) {
+      // Upstream connection-level failure (DNS, reset, etc.) — worth retrying.
+      return true;
+    }
   }
 
   return false;
