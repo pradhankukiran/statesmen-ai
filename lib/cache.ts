@@ -68,8 +68,16 @@ async function blobUrl(pathname: string): Promise<string | null> {
     return meta.url;
   } catch (err) {
     // @vercel/blob throws BlobNotFoundError when the object does not exist.
-    // We treat any "not found" failure as a cache miss; other errors bubble.
-    if (err instanceof Error && /not\s*found/i.test(err.message)) return null;
+    // The runtime message is "The requested blob does not exist." (varies by
+    // SDK version), so match on both 'not found' and 'does not exist' plus
+    // the error class name. We treat any of these as a cache miss; other
+    // errors bubble.
+    if (
+      err instanceof Error &&
+      /(not\s*found|does\s*not\s*exist)/i.test(err.message)
+    ) {
+      return null;
+    }
     if (
       err &&
       typeof err === "object" &&
@@ -114,7 +122,12 @@ async function blobHas(pathname: string): Promise<boolean> {
     await head(pathname);
     return true;
   } catch (err) {
-    if (err instanceof Error && /not\s*found/i.test(err.message)) return false;
+    if (
+      err instanceof Error &&
+      /(not\s*found|does\s*not\s*exist)/i.test(err.message)
+    ) {
+      return false;
+    }
     if (
       err &&
       typeof err === "object" &&
