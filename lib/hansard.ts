@@ -46,10 +46,34 @@ export type Contribution = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function stripXml(s: string): string {
-  return s
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  // Convert block-level / paragraph-style tags to `\n\n` BEFORE removing
+  // anything else, so the downstream chunker (which splits on \n\s*\n) has
+  // real paragraph boundaries to work with even when ContributionText is
+  // empty and we fall back to ContributionTextFull.
+  //
+  // Hansard's actual markup (verified against the live API) is small and
+  // predictable: <p></p> for paragraph breaks, <blockquote>/<q> wrapping
+  // long quotations, <em> for emphasis, <span class="column-number"> for
+  // page-column markers, occasionally <sup> and the spec-mentioned <br>
+  // variants. Treat the block-ish ones as paragraph breaks; let everything
+  // else fall through to the generic tag stripper as inline.
+  const withParagraphBreaks = s
+    .replace(/<\/?p\s*\/?>/gi, "\n\n")
+    .replace(/<br\s*\/?>/gi, "\n\n")
+    .replace(/<\/?blockquote\s*\/?>/gi, "\n\n");
+
+  return (
+    withParagraphBreaks
+      // Drop all remaining tags (inline: em, q, span, sup, …).
+      .replace(/<[^>]+>/g, " ")
+      // Collapse runs of spaces/tabs but preserve newlines.
+      .replace(/[ \t]+/g, " ")
+      // Trim spaces around newlines so blank-line detection is robust.
+      .replace(/[ \t]*\n[ \t]*/g, "\n")
+      // Collapse 3+ consecutive newlines down to a single \n\n boundary.
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
 }
 
 function toContribution(r: z.infer<typeof ContributionRawSchema>): Contribution {

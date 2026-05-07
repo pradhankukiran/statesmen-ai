@@ -20,6 +20,7 @@ import {
 import { chunkByTokens, countTokens } from "./chunker";
 import { extractStyleFromChunk } from "./extractor";
 import { mergeExtractions, type MergedPersona } from "./merger";
+import { getMember } from "./members";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,13 @@ export type PersonaMeta = {
     startDate: string;
     endDate: string;
   };
+  /**
+   * For memberId-sourced personas: the date their latest house membership
+   * ended (or null if still serving). Used as the era cutoff in the chat
+   * system prompt for modern ex-PMs (Boris Johnson, Liz Truss, …) whose
+   * `meta.attribution` is undefined.
+   */
+  endedAt?: string | null;
   contributionCount: number;
   chunkCount: number;
   totalTokens: number;
@@ -98,23 +106,31 @@ export async function collectContributions(
 
   // Attribution-based path (historical figures whose MemberId is unset).
   if (config.searchTerms && config.searchTerms.length > 0) {
-    // Topic-driven: query each term, filter by attribution.
+    // Topic-driven: query each term in parallel, then dedupe by id while
+    // preserving the original search-term ordering. We can't early-exit
+    // on the per-query loop the way the serial version did, but Hansard's
+    // take=100 cap bounds the per-query cost so total work is bounded by
+    // searchTerms.length * 100 — same as the worst case of the serial path.
+    // The `config.max` cap is enforced post-dedupe.
+    const perTerm = await Promise.all(
+      config.searchTerms.map((term) =>
+        searchContributions({
+          searchTerm: term,
+          startDate: config.startDate,
+          endDate: config.endDate,
+          attributedTo: config.label,
+          take: 100,
+        }),
+      ),
+    );
     const collected: Contribution[] = [];
     const seen = new Set<string>();
-    for (const term of config.searchTerms) {
-      const { contributions } = await searchContributions({
-        searchTerm: term,
-        startDate: config.startDate,
-        endDate: config.endDate,
-        attributedTo: config.label,
-        take: 100,
-      });
+    for (const { contributions } of perTerm) {
       for (const c of contributions) {
         if (seen.has(c.id)) continue;
         seen.add(c.id);
         collected.push(c);
       }
-      if (collected.length >= config.max) break;
     }
     return collected.slice(0, config.max);
   }
@@ -153,6 +169,14 @@ export async function buildPersona(
   const emit = opts.onProgress ?? (() => {});
 
   emit({ type: "fetch_start" });
+  // For memberId-sourced personas, kick off a member-profile lookup in
+  // parallel with the contributions fetch so we can record `endedAt` for
+  // the era-cutoff in the rendered persona. Best-effort: a Members API
+  // failure should not fail the build, just leave `endedAt` undefined.
+  const memberPromise =
+    opts.fetch.kind === "memberId"
+      ? getMember(opts.fetch.memberId).catch(() => null)
+      : Promise.resolve(null);
   const contributions = await collectContributions(opts.fetch);
   emit({ type: "fetch_done", count: contributions.length });
 
@@ -209,6 +233,8 @@ export async function buildPersona(
 
   emit({ type: "render_done" });
 
+  const member = await memberPromise;
+
   return {
     meta: {
       name: opts.name,
@@ -224,6 +250,8 @@ export async function buildPersona(
               endDate: opts.fetch.endDate,
             }
           : undefined,
+      endedAt:
+        opts.fetch.kind === "memberId" ? member?.endedAt ?? null : undefined,
       contributionCount: contributions.length,
       chunkCount: chunks.length,
       totalTokens,
@@ -238,12 +266,27 @@ export async function buildPersona(
 const list = (items: string[], quoted = false) =>
   items.map((i) => (quoted ? `- "${i}"` : `- ${i}`)).join("\n");
 
+/**
+ * Format a date-ish string (ISO datetime or YYYY-MM-DD) for the era-cutoff
+ * line in the rendered persona. Strips the time portion if present so we
+ * get a clean `YYYY-MM-DD`. Returns the raw input unchanged if it doesn't
+ * match a recognisable date prefix.
+ */
+function formatCutoffDate(raw: string): string {
+  const m = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : raw;
+}
+
 export function renderPersonaMd(p: Persona): string {
   const { meta, body } = p;
 
-  // Era cutoff: prefer an explicit attribution endDate; otherwise fall back
-  // to "the present day" for modern memberId-sourced personas.
-  const cutoff = meta.attribution?.endDate ?? "the present day";
+  // Era cutoff resolution order:
+  //   1. attribution.endDate  (historical PMs whose tenure dates we picked)
+  //   2. meta.endedAt         (modern ex-PMs: Members API endedAt of their
+  //                            latest house membership)
+  //   3. "the present day"    (still-serving members)
+  const rawCutoff = meta.attribution?.endDate ?? meta.endedAt ?? null;
+  const cutoff = rawCutoff ? formatCutoffDate(rawCutoff) : "the present day";
 
   return `# ${meta.name}
 

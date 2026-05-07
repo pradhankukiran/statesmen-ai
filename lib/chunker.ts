@@ -20,6 +20,22 @@ export type ChunkOptions = {
 
 const SENTENCE_BOUNDARY = /(?<=[.!?])\s+(?=[A-Z"'“‘])/;
 
+/**
+ * Hard-slice a string into pieces of at most `max` tokens by encoding to
+ * tokens and slicing the token array. Used as a last resort when sentence
+ * splitting still leaves a single "sentence" (or a paragraph with no
+ * detectable sentence boundaries) over the per-chunk budget.
+ */
+function hardSliceByTokens(text: string, max: number): string[] {
+  const tokens = enc.encode(text);
+  if (tokens.length <= max) return [text];
+  const out: string[] = [];
+  for (let i = 0; i < tokens.length; i += max) {
+    out.push(enc.decode(tokens.slice(i, i + max)));
+  }
+  return out;
+}
+
 function splitOversizedParagraph(text: string, max: number): string[] {
   const sentences = text.split(SENTENCE_BOUNDARY);
   const out: string[] = [];
@@ -27,6 +43,17 @@ function splitOversizedParagraph(text: string, max: number): string[] {
   let currentTokens = 0;
   for (const s of sentences) {
     const t = countTokens(s);
+    // Single sentence already over budget — hard-slice it by tokens. Flush
+    // any in-flight `current` first so ordering is preserved.
+    if (t > max) {
+      if (current) {
+        out.push(current);
+        current = "";
+        currentTokens = 0;
+      }
+      out.push(...hardSliceByTokens(s, max));
+      continue;
+    }
     if (current && currentTokens + t > max) {
       out.push(current);
       current = s;
@@ -83,6 +110,22 @@ export function chunkByTokens(text: string, opts: ChunkOptions = {}): string[] {
   }
 
   if (current) chunks.push(current);
+
+  // Final guard: nothing leaves this function over `max`. Pathological
+  // inputs (e.g. paragraph splitting succeeded but a glued accumulator
+  // somehow exceeded budget, or `splitOversized` was disabled) get a hard
+  // token-level slice as the last line of defence.
+  if (split) {
+    const guarded: string[] = [];
+    for (const c of chunks) {
+      if (countTokens(c) > max) {
+        guarded.push(...hardSliceByTokens(c, max));
+      } else {
+        guarded.push(c);
+      }
+    }
+    return guarded;
+  }
 
   return chunks;
 }
