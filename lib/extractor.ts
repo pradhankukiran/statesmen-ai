@@ -2,6 +2,7 @@ import { z } from "zod";
 import { generateObject } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { EXTRACT_SYSTEM, buildExtractPrompt } from "./prompts/extract";
+import { EXTRACT_MODEL } from "./models";
 
 // ─── Output schema (also used as AI SDK structured-output schema) ─────────────
 
@@ -42,10 +43,8 @@ export type Extraction = z.infer<typeof ExtractionSchema>;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-const DEFAULT_MODEL = "anthropic/claude-3.5-sonnet";
-
 export type ExtractOptions = {
-  /** Override the OpenRouter model id. Default: env or claude-3.5-sonnet. */
+  /** Override the OpenRouter model id. Default: lib/models#EXTRACT_MODEL. */
   model?: string;
   /** Sampling temperature. Default 0.2 — extraction wants determinism. */
   temperature?: number;
@@ -64,8 +63,7 @@ export async function extractStyleFromChunk(
   }
 
   const openrouter = createOpenRouter({ apiKey });
-  const modelId =
-    opts.model ?? process.env.OPENROUTER_EXTRACT_MODEL ?? DEFAULT_MODEL;
+  const modelId = opts.model ?? EXTRACT_MODEL;
 
   const { object } = await generateObject({
     model: openrouter(modelId),

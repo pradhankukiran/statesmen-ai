@@ -3,6 +3,7 @@ import { generateObject } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { MERGE_SYSTEM, buildMergePrompt } from "./prompts/merge";
 import type { Extraction } from "./extractor";
+import { MERGE_MODEL } from "./models";
 
 // ─── Schema for the consolidated persona ──────────────────────────────────────
 
@@ -49,9 +50,8 @@ export type MergedPersona = z.infer<typeof MergedPersonaSchema>;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-const DEFAULT_MODEL = "anthropic/claude-3.5-sonnet";
-
 export type MergeOptions = {
+  /** Override the OpenRouter model id. Default: lib/models#MERGE_MODEL. */
   model?: string;
   temperature?: number;
 };
@@ -72,8 +72,7 @@ export async function mergeExtractions(
   }
 
   const openrouter = createOpenRouter({ apiKey });
-  const modelId =
-    opts.model ?? process.env.OPENROUTER_EXTRACT_MODEL ?? DEFAULT_MODEL;
+  const modelId = opts.model ?? MERGE_MODEL;
 
   const { object } = await generateObject({
     model: openrouter(modelId),
