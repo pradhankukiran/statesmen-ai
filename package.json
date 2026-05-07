@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "script:fetch": "tsx scripts/test-fetch.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
