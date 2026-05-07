@@ -7,14 +7,14 @@
  *
  * Override in `.env.local` to swap providers/models without code changes:
  *
- *   OPENROUTER_EXTRACT_MODEL=anthropic/claude-3.5-sonnet
- *   OPENROUTER_MERGE_MODEL=anthropic/claude-3-opus
+ *   OPENROUTER_EXTRACT_MODEL=anthropic/claude-sonnet-4.5
+ *   OPENROUTER_MERGE_MODEL=anthropic/claude-opus-4.5
  *   GROQ_CHAT_MODEL=llama-3.3-70b-versatile
  */
 
 // Per-chunk style extraction (offline, quality-sensitive).
 export const EXTRACT_MODEL: string =
-  process.env.OPENROUTER_EXTRACT_MODEL ?? "anthropic/claude-3.5-sonnet";
+  process.env.OPENROUTER_EXTRACT_MODEL ?? "anthropic/claude-sonnet-4.5";
 
 // Reduce N chunk extractions to one consolidated persona. Defaults to the
 // extract model so a single override changes both stages, but can be set
