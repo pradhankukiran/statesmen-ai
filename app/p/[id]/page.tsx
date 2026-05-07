@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { ChatCta } from "@/components/chat-cta";
-import { getMember, type Member } from "@/lib/members";
+import { getMember, getMemberPhotoUrl, type Member } from "@/lib/members";
+import { getPopularPMBySlug, type PopularPM } from "@/lib/popular";
+import { slugify } from "@/lib/slug";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -27,15 +29,76 @@ function formatTerm(member: Member): string | null {
   return `${start}–${end}`;
 }
 
-async function loadMember(rawId: string): Promise<Member> {
-  const id = parsePositiveInt(rawId);
-  if (id === null) notFound();
+// ─── Profile data ─────────────────────────────────────────────────────────────
+//
+// Both the Members API path (modern) and the popular-pms-registry path
+// (historical) feed into this slim shape so the page renders uniformly.
+//
+// `slug` is the persona key fed to ChatCta — for modern entries it's
+// derived via `slugify(name)` upstream; for historical entries it's the
+// authored slug from popular-pms.json.
 
-  try {
-    return await getMember(id);
-  } catch {
-    notFound();
+type ProfileData = {
+  slug: string;
+  name: string;
+  fullTitle: string | null;
+  party: string | null;
+  partyColor: string | null;
+  house: string;
+  term: string | null;
+  photoUrl: string | null;
+  /** Numeric Members API id when this profile maps to one. */
+  memberId: number | null;
+  /** Source-of-truth registry entry for historical figures. */
+  popular: PopularPM | null;
+};
+
+async function loadProfile(rawId: string): Promise<ProfileData> {
+  // Path 1: numeric id → Members API.
+  const numericId = parsePositiveInt(rawId);
+  if (numericId !== null) {
+    let member: Member;
+    try {
+      member = await getMember(numericId);
+    } catch {
+      notFound();
+    }
+    return {
+      slug: slugify(member.name),
+      name: member.name,
+      fullTitle: member.fullTitle,
+      party: member.party,
+      partyColor: member.partyColor,
+      house: member.house,
+      term: formatTerm(member),
+      photoUrl: member.photoUrl,
+      memberId: member.id,
+      popular: null,
+    };
   }
+
+  // Path 2: non-numeric → popular-pms registry by slug. This is how
+  // historical figures (Thatcher, Churchill) reach the profile page.
+  const pm = getPopularPMBySlug(rawId);
+  if (pm === undefined) notFound();
+
+  return {
+    slug: pm.slug,
+    name: pm.name,
+    fullTitle: null,
+    party: pm.party,
+    partyColor: pm.partyColor,
+    house: pm.house,
+    term: pm.term,
+    photoUrl:
+      pm.kind === "memberId"
+        ? pm.photoUrl
+        : pm.photoMemberId !== undefined
+          ? getMemberPhotoUrl(pm.photoMemberId)
+          : null,
+    memberId: pm.kind === "memberId" ? pm.id : null,
+    popular: pm,
+  };
 }
 
 // ─── Metadata ─────────────────────────────────────────────────────────────────
@@ -47,12 +110,10 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   try {
-    const numericId = parsePositiveInt(id);
-    if (numericId === null) return { title: "Profile not found" };
-    const member = await getMember(numericId);
+    const profile = await loadProfile(id);
     return {
-      title: `${member.name} — Statesmen AI`,
-      description: member.fullTitle ?? `Profile of ${member.name}.`,
+      title: `${profile.name} — Statesmen AI`,
+      description: profile.fullTitle ?? `Profile of ${profile.name}.`,
     };
   } catch {
     return { title: "Profile not found" };
@@ -73,25 +134,33 @@ export default async function ProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const member = await loadMember(id);
-  const term = formatTerm(member);
+  const profile = await loadProfile(id);
 
   // Build the yellow accent pill: "PARTY · TERM" if both, else whichever we
   // have, falling back to just the house. Keeps the pill terse and
   // information-rich, like the landing-page hero badge.
   const pillBits: string[] = [];
-  if (member.party) pillBits.push(member.party);
-  if (term) pillBits.push(term);
-  if (pillBits.length === 0) pillBits.push(member.house);
+  if (profile.party) pillBits.push(profile.party);
+  if (profile.term) pillBits.push(profile.term);
+  if (pillBits.length === 0) pillBits.push(profile.house);
   const pillText = pillBits.join(" · ");
 
   // Sub-headline: small uppercase-tracked accent line under the name.
   // House always shows; fullTitle joins with a separator when distinct from
   // the display name, so peers/MPs read at a glance.
-  const subBits: string[] = [member.house];
-  if (member.fullTitle && member.fullTitle !== member.name) {
-    subBits.push(member.fullTitle);
+  const subBits: string[] = [profile.house];
+  if (profile.fullTitle && profile.fullTitle !== profile.name) {
+    subBits.push(profile.fullTitle);
   }
+
+  // Initials fallback for photos we can't source (historical figures with
+  // no `photoMemberId`, e.g. Churchill).
+  const photoInitials = (() => {
+    const parts = profile.name.trim().split(/\s+/);
+    const first = parts[0]?.[0] ?? "";
+    const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+    return `${first}${last}`.toUpperCase();
+  })();
 
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-24">
@@ -105,7 +174,7 @@ export default async function ProfilePage({
         </span>
 
         <h1 className="text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
-          {member.name}
+          {profile.name}
         </h1>
 
         <p className="mt-4 text-xs uppercase tracking-widest text-muted-foreground">
@@ -118,38 +187,56 @@ export default async function ProfilePage({
          border rectangle — no card, no shadow, no soft corners. Info column
          flows naturally beside it. */}
       <section className="mt-12 grid gap-10 sm:mt-16 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:gap-12">
-        {/* Photo — brutalist frame with optional party-colour stripe. */}
+        {/* Photo — brutalist frame with optional party-colour stripe.
+           Falls back to a brand-yellow initials tile for historical figures
+           with no available portrait. */}
         <div className="relative max-w-sm">
-          {member.partyColor ? (
+          {profile.partyColor ? (
             <span
               aria-hidden
               className="absolute -left-3 top-0 block h-full w-1.5 sm:-left-4 sm:w-2"
-              style={{ backgroundColor: member.partyColor }}
+              style={{ backgroundColor: profile.partyColor }}
             />
           ) : null}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={member.photoUrl}
-            alt={`Portrait of ${member.name}`}
-            className="aspect-[3/4] w-full rounded-md border-2 border-foreground bg-muted object-cover"
-            loading="eager"
-          />
+          {profile.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={profile.photoUrl}
+              alt={`Portrait of ${profile.name}`}
+              className="aspect-[3/4] w-full rounded-md border-2 border-foreground bg-muted object-cover"
+              loading="eager"
+            />
+          ) : (
+            <div
+              aria-hidden
+              className="flex aspect-[3/4] w-full items-center justify-center rounded-md border-2 border-foreground bg-brand text-6xl font-semibold tracking-tight text-brand-foreground sm:text-7xl"
+            >
+              {photoInitials}
+            </div>
+          )}
         </div>
 
         {/* Info column — bio paragraph + CTA + tiny footnote. */}
         <div className="flex flex-col gap-8">
           <p className="max-w-xl text-base text-muted-foreground sm:text-lg">
             Profile sourced from the UK Parliament Members API. Click below to
-            chat with an AI persona built from {member.name}&apos;s real
+            chat with an AI persona built from {profile.name}&apos;s real
             recorded speeches in Hansard.
           </p>
 
           <div>
-            <ChatCta id={member.id} name={member.name} />
+            <ChatCta
+              slug={profile.slug}
+              name={profile.name}
+              memberId={profile.memberId}
+              hasAttribution={
+                profile.popular?.kind === "attribution" ? true : false
+              }
+            />
           </div>
 
           <p className="text-xs uppercase tracking-widest text-muted-foreground">
-            AI-generated · Not actual statements by {member.name}
+            AI-generated · Not actual statements by {profile.name}
           </p>
         </div>
       </section>

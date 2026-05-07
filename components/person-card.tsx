@@ -4,7 +4,14 @@ import { cn } from "@/lib/utils";
 import { getMemberPhotoUrl } from "@/lib/members";
 
 export type PersonCardProps = {
-  id: number;
+  /**
+   * Profile-route identifier. Either:
+   *   - a numeric Members API id (modern PMs / search results), routed as
+   *     `/p/<id>` and resolved via `getMember()`; or
+   *   - a string slug (historical / popular-pms entries), routed as
+   *     `/p/<slug>` and resolved via the popular-pms registry.
+   */
+  id: number | string;
   name: string;
   party?: string | null;
   partyColor?: string | null;
@@ -37,6 +44,13 @@ function deriveTerm(
   return end ? `${start}–${end}` : `${start}–`;
 }
 
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return `${first}${last}`.toUpperCase();
+}
+
 export function PersonCard({
   id,
   name,
@@ -50,7 +64,14 @@ export function PersonCard({
   photoUrl,
   className,
 }: PersonCardProps) {
-  const src = photoUrl ?? getMemberPhotoUrl(id);
+  // Photo source resolution:
+  //   - explicit `photoUrl` always wins (set by popular-pms.json or search
+  //     results upstream),
+  //   - else fall back to `getMemberPhotoUrl(id)` only when `id` is numeric,
+  //   - else `null`, which triggers an initials-tile fallback below
+  //     (used by historical entries with no photoMemberId, e.g. Churchill).
+  const src =
+    photoUrl ?? (typeof id === "number" ? getMemberPhotoUrl(id) : null);
   const derivedTerm = deriveTerm(term, startedAt, endedAt);
   const subtitleParts: string[] = [];
   if (house) subtitleParts.push(house);
@@ -71,15 +92,24 @@ export function PersonCard({
         className="h-full transition-colors group-hover:bg-muted/50 group-focus-visible:bg-muted/50"
       >
         <div className="aspect-[3/4] w-full overflow-hidden bg-muted">
-          {/* Plain <img> intentional: next/image needs remotePatterns config. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={src}
-            alt={`Portrait of ${name}`}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-          />
+          {src ? (
+            // Plain <img> intentional: next/image needs remotePatterns config.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={src}
+              alt={`Portrait of ${name}`}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            />
+          ) : (
+            <div
+              aria-hidden
+              className="flex h-full w-full items-center justify-center bg-brand text-3xl font-semibold tracking-tight text-brand-foreground sm:text-4xl"
+            >
+              {initials(name)}
+            </div>
+          )}
         </div>
         <CardContent className="flex flex-col gap-1.5">
           <div className="font-heading text-base leading-snug font-medium">

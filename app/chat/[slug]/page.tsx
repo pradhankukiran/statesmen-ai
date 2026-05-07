@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { ChatWindow } from "@/components/chat-window";
 import { getPersona } from "@/lib/cache";
 import { getMemberPhotoUrl } from "@/lib/members";
+import { getPopularPMBySlug } from "@/lib/popular";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,10 +52,20 @@ export default async function ChatPage({
   }
 
   const { meta } = cached;
-  const photoUrl =
+  // Photo source preference for the chat header avatar:
+  //   1. The persona's own `meta.memberId` (modern PMs).
+  //   2. The `photoMemberId` recorded in popular-pms.json for historical
+  //      figures (e.g. Thatcher's Lords-era id 953).
+  //   3. Undefined → the avatar falls back to initials.
+  const popular = getPopularPMBySlug(slug);
+  const photoMemberId =
     typeof meta.memberId === "number"
-      ? getMemberPhotoUrl(meta.memberId)
-      : undefined;
+      ? meta.memberId
+      : popular?.kind === "attribution" && popular.photoMemberId !== undefined
+        ? popular.photoMemberId
+        : null;
+  const photoUrl =
+    photoMemberId !== null ? getMemberPhotoUrl(photoMemberId) : undefined;
 
   return (
     <ChatWindow

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
-import { BuildProgress } from "@/components/build-progress";
+import { BuildProgress, type BuildAttribution } from "@/components/build-progress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getMember } from "@/lib/members";
+import { getPopularPMBySlug } from "@/lib/popular";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,18 @@ export const metadata: Metadata = {
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
+//
+// Two routes converge here, distinguished by what the URL provides:
+//
+//   • `?id=<memberId>` → modern PM. We fetch their display name from the
+//     Members API and feed BuildProgress a `memberId` config.
+//
+//   • no `?id` → historical figure. We look up the slug in
+//     popular-pms.json server-side and feed BuildProgress an `attribution`
+//     config sourced from the registry. This is how Thatcher & Churchill
+//     reach attribution-mode builds.
+//
+// If neither path resolves we render a malformed-URL card.
 
 export default async function BuildPage({
   params,
@@ -44,38 +57,54 @@ export default async function BuildPage({
 
   const memberId = parsePositiveInt(readSearchParam(sp, "id"));
 
-  if (memberId === null) {
+  // ─── Path 1: modern (memberId) ────────────────────────────────────────────
+  if (memberId !== null) {
+    let name: string;
+    try {
+      const member = await getMember(memberId);
+      name = member.name;
+    } catch {
+      // Server-side lookup failed; fall back to the slug. The build endpoint
+      // only needs `name` for the system prompt header, so this is safe.
+      name = slug;
+    }
     return (
-      <div className="mx-auto w-full max-w-2xl px-6 py-16 sm:py-24">
-        <Card>
-          <CardContent className="flex flex-col items-start gap-4 p-6 sm:p-8">
-            <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
-              Build URL is malformed.
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              This build URL is malformed. Return to homepage.
-            </p>
-            <Button render={<Link href="/" />}>Return to homepage</Button>
-          </CardContent>
-        </Card>
+      <div className="mx-auto w-full max-w-2xl px-6 py-12 sm:py-16">
+        <BuildProgress slug={slug} name={name} memberId={memberId} />
       </div>
     );
   }
 
-  // Fetch the member's name server-side. If lookup fails we still render the
-  // page using the slug as a fallback display name, since the build endpoint
-  // only needs `name` for the system prompt.
-  let name: string;
-  try {
-    const member = await getMember(memberId);
-    name = member.name;
-  } catch {
-    name = slug;
+  // ─── Path 2: historical (attribution) ─────────────────────────────────────
+  const pm = getPopularPMBySlug(slug);
+  if (pm && pm.kind === "attribution") {
+    const attribution: BuildAttribution = {
+      label: pm.attribution.label,
+      startDate: pm.attribution.startDate,
+      endDate: pm.attribution.endDate,
+      searchTerms: pm.attribution.searchTerms,
+    };
+    return (
+      <div className="mx-auto w-full max-w-2xl px-6 py-12 sm:py-16">
+        <BuildProgress slug={slug} name={pm.name} attribution={attribution} />
+      </div>
+    );
   }
 
+  // ─── Fallback: neither path applies ───────────────────────────────────────
   return (
-    <div className="mx-auto w-full max-w-2xl px-6 py-12 sm:py-16">
-      <BuildProgress slug={slug} name={name} memberId={memberId} />
+    <div className="mx-auto w-full max-w-2xl px-6 py-16 sm:py-24">
+      <Card>
+        <CardContent className="flex flex-col items-start gap-4 p-6 sm:p-8">
+          <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+            Build URL is malformed.
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            This build URL is malformed. Return to homepage.
+          </p>
+          <Button render={<Link href="/" />}>Return to homepage</Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

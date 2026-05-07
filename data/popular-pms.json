@@ -1,5 +1,6 @@
 [
   {
+    "slug": "boris-johnson",
     "id": 1423,
     "name": "Boris Johnson",
     "party": "Conservative",
@@ -10,6 +11,7 @@
     "photoUrl": "https://members-api.parliament.uk/api/Members/1423/Thumbnail"
   },
   {
+    "slug": "keir-starmer",
     "id": 4514,
     "name": "Keir Starmer",
     "party": "Labour",
@@ -20,6 +22,7 @@
     "photoUrl": "https://members-api.parliament.uk/api/Members/4514/Thumbnail"
   },
   {
+    "slug": "rishi-sunak",
     "id": 4483,
     "name": "Rishi Sunak",
     "party": "Conservative",
@@ -30,6 +33,7 @@
     "photoUrl": "https://members-api.parliament.uk/api/Members/4483/Thumbnail"
   },
   {
+    "slug": "liz-truss",
     "id": 4097,
     "name": "Liz Truss",
     "party": "Conservative",
@@ -40,6 +44,7 @@
     "photoUrl": "https://members-api.parliament.uk/api/Members/4097/Thumbnail"
   },
   {
+    "slug": "theresa-may",
     "id": 1467,
     "name": "Theresa May",
     "party": "Conservative",
@@ -48,5 +53,58 @@
     "term": "2016–2019",
     "tagline": "Brexit PM",
     "photoUrl": "https://members-api.parliament.uk/api/Members/1467/Thumbnail"
+  },
+  {
+    "slug": "margaret-thatcher",
+    "name": "Margaret Thatcher",
+    "party": "Conservative",
+    "partyColor": "#0063ba",
+    "house": "Commons",
+    "term": "1979–1990",
+    "tagline": "The Iron Lady",
+    "photoMemberId": 953,
+    "attribution": {
+      "label": "The Prime Minister",
+      "startDate": "1979-05-04",
+      "endDate": "1990-11-28",
+      "searchTerms": [
+        "falklands",
+        "miners",
+        "european",
+        "soviet",
+        "unions",
+        "privatisation",
+        "defence",
+        "ira",
+        "inflation",
+        "thatcher"
+      ]
+    }
+  },
+  {
+    "slug": "winston-churchill",
+    "name": "Sir Winston Churchill",
+    "party": "Conservative",
+    "partyColor": "#0063ba",
+    "house": "Commons",
+    "term": "1940–1945, 1951–1955",
+    "tagline": "Wartime PM",
+    "attribution": {
+      "label": "The Prime Minister",
+      "startDate": "1940-05-10",
+      "endDate": "1955-04-05",
+      "searchTerms": [
+        "war",
+        "germany",
+        "victory",
+        "europe",
+        "soviet",
+        "empire",
+        "defence",
+        "freedom",
+        "iron curtain",
+        "churchill"
+      ]
+    }
   }
 ]

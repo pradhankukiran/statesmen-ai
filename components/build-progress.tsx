@@ -32,13 +32,29 @@ type Step = {
   pending: boolean;
 };
 
+/**
+ * Attribution config shape passed in for historical figures. Mirrors the
+ * `attribution` body the `/api/persona/build` route accepts. Kept here as a
+ * named export so the build page can import it without depending on the
+ * server-only persona module.
+ */
+export type BuildAttribution = {
+  label: string;
+  startDate: string;
+  endDate: string;
+  searchTerms?: string[];
+};
+
 type Props = {
   slug: string;
   name: string;
-  memberId: number;
+  /** Modern path: numeric Members API id. Mutually exclusive with `attribution`. */
+  memberId?: number;
+  /** Historical path: attribution config. Mutually exclusive with `memberId`. */
+  attribution?: BuildAttribution;
 };
 
-export function BuildProgress({ slug, name, memberId }: Props) {
+export function BuildProgress({ slug, name, memberId, attribution }: Props) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("idle");
   const [steps, setSteps] = useState<Step[]>([]);
@@ -144,10 +160,18 @@ export function BuildProgress({ slug, name, memberId }: Props) {
     setExtractProgress(null);
 
     try {
+      // Build the request body. The `/api/persona/build` route accepts either
+      // a `memberId` (modern PM) or an `attribution` config (historical PM)
+      // — exactly one — and validates that contract server-side.
+      const body =
+        attribution !== undefined
+          ? { slug, name, attribution }
+          : { slug, name, memberId };
+
       const res = await fetch("/api/persona/build", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, name, memberId }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
 
@@ -220,7 +244,7 @@ export function BuildProgress({ slug, name, memberId }: Props) {
       setErrorMessage(message);
       setPhase("error");
     }
-  }, [handleEvent, memberId, name, slug]);
+  }, [handleEvent, memberId, attribution, name, slug]);
 
   // Auto-start once on first mount only. Browser back/forward should NOT
   // re-fire the pipeline.

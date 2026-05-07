@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Loader2, MessageSquare } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { slugify } from "@/lib/slug";
 
 type StatusResponse =
   | { status: "ready" }
@@ -13,8 +12,22 @@ type StatusResponse =
   | { error: string };
 
 type Props = {
-  id: number;
+  /** Persona cache key (also the URL segment for /chat and /build). */
+  slug: string;
   name: string;
+  /**
+   * Members API id, when this profile maps to one. Forwarded as `?id=` to
+   * `/build/<slug>` so the build page can render the modern (memberId) flow.
+   * Null for historical figures whose builds run in attribution mode — the
+   * build page then resolves attribution server-side from popular-pms.json.
+   */
+  memberId: number | null;
+  /**
+   * True when the figure's persona is built via attribution mode. Used purely
+   * as a defensive guard — without either a memberId or a registered
+   * attribution entry, we'd have nothing to feed the build pipeline.
+   */
+  hasAttribution: boolean;
 };
 
 // ─── ChatCta ──────────────────────────────────────────────────────────────────
@@ -27,17 +40,21 @@ type Props = {
 // Loading copy stays as "Checking…" but renders in the same big type as the
 // resting state so the button doesn't shrink/wobble between states.
 
-export function ChatCta({ id, name }: Props) {
+export function ChatCta({ slug, name, memberId, hasAttribution }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isChecking, setIsChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isBusy = isChecking || isPending;
-  const slug = slugify(name);
+  const canBuild = memberId !== null || hasAttribution;
 
   async function handleClick() {
     setError(null);
+    if (!canBuild) {
+      setError("This figure has no Members API id or attribution config.");
+      return;
+    }
     setIsChecking(true);
     try {
       const res = await fetch(
@@ -63,8 +80,13 @@ export function ChatCta({ id, name }: Props) {
       }
 
       if ("status" in data && data.status === "missing") {
+        // Modern PMs append `?id=<memberId>` so the build page renders
+        // memberId-mode immediately. Historical PMs route plain — the build
+        // page resolves attribution from popular-pms.json on the server.
+        const target =
+          memberId !== null ? `/build/${slug}?id=${memberId}` : `/build/${slug}`;
         startTransition(() => {
-          router.push(`/build/${slug}?id=${id}`);
+          router.push(target);
         });
         return;
       }
@@ -84,7 +106,7 @@ export function ChatCta({ id, name }: Props) {
       <button
         type="button"
         onClick={handleClick}
-        disabled={isBusy}
+        disabled={isBusy || !canBuild}
         aria-busy={isBusy || undefined}
         className={cn(
           // Brutalist primary: flat brand-yellow fill, heavy black border,

@@ -1,16 +1,18 @@
-import popularPMs from "@/data/popular-pms.json";
 import { PersonGrid, type PersonGridItem } from "@/components/person-grid";
 import { SearchBar } from "@/components/search-bar";
+import { getPopularPMs, popularPhotoUrl } from "@/lib/popular";
 
-const popularItems: PersonGridItem[] = popularPMs.map((pm) => ({
-  id: pm.id,
+const popularItems: PersonGridItem[] = getPopularPMs().map((pm) => ({
+  // memberId entries route as /p/<id>; attribution entries route as /p/<slug>.
+  // PersonCard accepts either as `id`.
+  id: pm.kind === "memberId" ? pm.id : pm.slug,
   name: pm.name,
   party: pm.party,
   partyColor: pm.partyColor,
   house: pm.house,
   term: pm.term,
   tagline: pm.tagline,
-  photoUrl: pm.photoUrl,
+  photoUrl: popularPhotoUrl(pm),
 }));
 
 export default function Home() {
