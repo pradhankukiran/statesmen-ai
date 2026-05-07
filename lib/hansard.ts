@@ -7,9 +7,9 @@ const BASE = "https://hansard-api.parliament.uk";
 const ContributionRawSchema = z.object({
   ContributionExtId: z.string(),
   ItemId: z.number().nullish(),
-  MemberId: z.number(), // -1 for historical / unattributed-to-modern-id
+  MemberId: z.number().nullable(), // -1, real id, or null for historical/unattributed
   MemberName: z.string().nullish(),
-  AttributedTo: z.string(),
+  AttributedTo: z.string().nullable(),
   ContributionText: z.string().nullish(),
   ContributionTextFull: z.string().nullish(),
   SittingDate: z.string(),
@@ -22,8 +22,11 @@ const ContributionRawSchema = z.object({
 });
 
 const SearchResponseSchema = z.object({
-  TotalResultCount: z.number(),
+  TotalResultCount: z.number().nullish(),
   SpokenResultCount: z.number().nullish(),
+  WrittenResultCount: z.number().nullish(),
+  CorrectionsResultCount: z.number().nullish(),
+  DivisionsResultCount: z.number().nullish(),
   Results: z.array(ContributionRawSchema),
 });
 
@@ -58,9 +61,9 @@ function toContribution(r: z.infer<typeof ContributionRawSchema>): Contribution 
       : stripXml(r.ContributionTextFull ?? "");
   return {
     id: r.ContributionExtId,
-    memberId: r.MemberId,
+    memberId: r.MemberId ?? -1,
     memberName: r.MemberName ?? null,
-    attributedTo: r.AttributedTo,
+    attributedTo: r.AttributedTo ?? "",
     date: r.SittingDate,
     text,
     debateSection: r.DebateSection ?? null,
@@ -104,10 +107,32 @@ export async function searchContributions(
 
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`Hansard search failed: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Hansard search ${res.status} ${res.statusText} for ${url.toString()}`,
+    );
   }
 
-  const parsed = SearchResponseSchema.parse(await res.json());
+  const text = await res.text();
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `Hansard returned non-JSON (len=${text.length}): ${text.slice(0, 200)}`,
+    );
+  }
+
+  const result = SearchResponseSchema.safeParse(json);
+  if (!result.success) {
+    const issues = result.error.issues
+      .slice(0, 5)
+      .map((i) => `  - ${i.path.join(".")}: ${i.message}`)
+      .join("\n");
+    throw new Error(
+      `Hansard response shape mismatch for ${url.toString()}\n${issues}`,
+    );
+  }
+  const parsed = result.data;
   let contributions = parsed.Results.map(toContribution);
 
   if (opts.attributedTo) {
@@ -117,32 +142,53 @@ export async function searchContributions(
     );
   }
 
-  return { total: parsed.TotalResultCount, contributions };
+  // The API is inconsistent about which count fields it populates. Take the
+  // largest non-null value (or fall back to current page length).
+  const total =
+    parsed.TotalResultCount ??
+    Math.max(
+      parsed.SpokenResultCount ?? 0,
+      parsed.WrittenResultCount ?? 0,
+      parsed.CorrectionsResultCount ?? 0,
+      parsed.DivisionsResultCount ?? 0,
+      parsed.Results.length,
+    );
+
+  return { total, contributions };
 }
 
 /**
  * Async iterator over contributions across pages. Yields contributions one at
  * a time. Caller may `break` early. The Hansard endpoint's `take` cap appears
- * to be 100; pageSize defaults to that.
+ * to be 100; pageSize defaults to that. A small delay between pages keeps the
+ * public API happy.
  */
 export async function* iterateContributions(
-  opts: SearchContributionsOptions & { pageSize?: number; maxPages?: number },
+  opts: SearchContributionsOptions & {
+    pageSize?: number;
+    maxPages?: number;
+    pageDelayMs?: number;
+  },
 ): AsyncGenerator<Contribution, void, unknown> {
   const pageSize = Math.min(opts.pageSize ?? 100, 100);
   const maxPages = opts.maxPages ?? Infinity;
+  const pageDelayMs = opts.pageDelayMs ?? 250;
   let skip = opts.skip ?? 0;
   let pages = 0;
 
   while (pages < maxPages) {
-    const { contributions, total } = await searchContributions({
+    if (pages > 0 && pageDelayMs > 0) {
+      await new Promise((r) => setTimeout(r, pageDelayMs));
+    }
+    const { contributions } = await searchContributions({
       ...opts,
       take: pageSize,
       skip,
     });
+    // Trust "empty page = exhausted" rather than the unreliable total field.
     if (contributions.length === 0) return;
     for (const c of contributions) yield c;
     pages++;
     skip += pageSize;
-    if (skip >= total) return;
   }
 }
