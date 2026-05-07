@@ -11,8 +11,8 @@ node_modules/
 # Next.js
 .next/
 out/
-build/
-dist/
+/build/
+/dist/
 
 # Production
 *.tsbuildinfo
