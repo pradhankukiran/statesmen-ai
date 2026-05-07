@@ -30,7 +30,36 @@ type Step = {
   text: string;
   /** When `pending` is true, this step is the currently-active one. */
   pending: boolean;
+  /** Timestamp when this step transitioned to pending. */
+  startedAt: number;
+  /** Wall-clock duration once the step settled. */
+  durationMs?: number;
 };
+
+// Rotating hints shown under the active extract step so the page doesn't
+// look frozen during the slow free-tier LLM call (60-90s per chunk).
+const EXTRACT_HINTS = [
+  "Extracting vocabulary and pet phrases…",
+  "Identifying rhetorical devices…",
+  "Pulling verbatim quotes from the chunk…",
+  "Analysing tone and sentence patterns…",
+  "Free-tier models take ~60–90s per chunk — this is normal.",
+  "Tagging recurring topics and themes…",
+  "Hold tight — the model is still thinking.",
+];
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatStepDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const s = ms / 1000;
+  return s < 10 ? `${s.toFixed(1)}s` : `${Math.round(s)}s`;
+}
 
 /**
  * Attribution config shape passed in for historical figures. Mirrors the
@@ -63,6 +92,10 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
     done: number;
     total: number;
   } | null>(null);
+  // Elapsed wall-clock since the build started, ticked every second so the
+  // user always has a moving counter even during long LLM waits.
+  const [elapsedMs, setElapsedMs] = useState<number>(0);
+  const [hintIndex, setHintIndex] = useState<number>(0);
 
   // Guard so a re-mount (e.g. fast refresh, browser-back-then-forward) doesn't
   // automatically re-fire the build. The user must click "Try again" to retry.
@@ -71,23 +104,46 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
   // Run-token: incremented on every retry so an old in-flight stream can't
   // mutate state for the next run.
   const runIdRef = useRef(0);
+  const startTimeRef = useRef<number>(0);
 
-  // Replace the trailing pending step (if any) and add a new one.
+  // Replace the trailing pending step (if any) and add a new one. Settles the
+  // previously-active step with its wall-clock duration so the user sees how
+  // long each phase actually took.
   const advance = useCallback((id: string, text: string) => {
+    const now = Date.now();
     setSteps((prev) => {
-      const settled = prev.map((s) => ({ ...s, pending: false }));
+      const settled = prev.map((s) =>
+        s.pending
+          ? { ...s, pending: false, durationMs: now - s.startedAt }
+          : s,
+      );
       // If a step with the same id already exists, update its text in place.
       const existing = settled.findIndex((s) => s.id === id);
       if (existing !== -1) {
-        settled[existing] = { id, text, pending: true };
+        settled[existing] = {
+          ...settled[existing],
+          id,
+          text,
+          pending: true,
+          // Preserve original startedAt — same step, just relabelled.
+          startedAt: settled[existing].startedAt,
+          durationMs: undefined,
+        };
         return settled;
       }
-      return [...settled, { id, text, pending: true }];
+      return [...settled, { id, text, pending: true, startedAt: now }];
     });
   }, []);
 
   const finalizeAll = useCallback(() => {
-    setSteps((prev) => prev.map((s) => ({ ...s, pending: false })));
+    const now = Date.now();
+    setSteps((prev) =>
+      prev.map((s) =>
+        s.pending
+          ? { ...s, pending: false, durationMs: now - s.startedAt }
+          : s,
+      ),
+    );
   }, []);
 
   const handleEvent = useCallback(
@@ -258,8 +314,32 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
+    startTimeRef.current = Date.now();
     void startBuild();
   }, [startBuild]);
+
+  // Elapsed-time ticker. Ticks every second while the build is running so the
+  // counter visibly moves even during the slow extraction phase.
+  useEffect(() => {
+    if (phase !== "running") return;
+    const id = setInterval(() => {
+      setElapsedMs(Date.now() - startTimeRef.current);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  // Rotate the extract sub-hint while an extract step is pending so the page
+  // doesn't feel frozen during the long LLM call.
+  const isExtracting = steps.some(
+    (s) => s.pending && s.id === "extract",
+  );
+  useEffect(() => {
+    if (!isExtracting) return;
+    const id = setInterval(() => {
+      setHintIndex((i) => (i + 1) % EXTRACT_HINTS.length);
+    }, 4500);
+    return () => clearInterval(id);
+  }, [isExtracting]);
 
   const handleRetry = useCallback(() => {
     void startBuild();
@@ -276,10 +356,28 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
             Building {name}…
           </h1>
           <p className="text-sm text-muted-foreground">
-            This only happens once. Future visitors get instant chat. The cold
-            build typically runs for 30–90 seconds while we fetch speeches and
-            distil their style.
+            This only happens once. Future visitors get instant chat. Cold
+            builds typically run 30–120 seconds; free-tier LLMs sometimes
+            stretch that to 2–3 minutes.
           </p>
+          {phase === "running" || phase === "done" ? (
+            <div className="mt-1 flex items-center gap-3 text-xs uppercase tracking-widest text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className={
+                    phase === "running"
+                      ? "size-1.5 animate-pulse rounded-full bg-brand"
+                      : "size-1.5 rounded-full bg-brand"
+                  }
+                  aria-hidden
+                />
+                Elapsed
+              </span>
+              <span className="font-mono tabular-nums text-foreground">
+                {formatDuration(elapsedMs)}
+              </span>
+            </div>
+          ) : null}
         </header>
 
         <ol className="flex flex-col gap-2 border-l border-border pl-5">
@@ -292,27 +390,48 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
           {steps.map((step) => (
             <li
               key={step.id}
-              className="flex items-start gap-2 text-sm"
+              className="flex flex-col gap-1 text-sm"
               aria-current={step.pending ? "step" : undefined}
             >
-              {step.pending ? (
-                <Loader2
-                  className="mt-0.5 size-4 shrink-0 animate-spin text-brand"
-                  aria-hidden
-                />
-              ) : (
-                <CheckCircle2
-                  className="mt-0.5 size-4 shrink-0 text-brand"
-                  aria-hidden
-                />
-              )}
-              <span
-                className={
-                  step.pending ? "font-medium" : "text-muted-foreground"
-                }
-              >
-                {step.text}
-              </span>
+              <div className="flex items-start gap-2">
+                {step.pending ? (
+                  <Loader2
+                    className="mt-0.5 size-4 shrink-0 animate-spin text-brand"
+                    aria-hidden
+                  />
+                ) : (
+                  <CheckCircle2
+                    className="mt-0.5 size-4 shrink-0 text-brand"
+                    aria-hidden
+                  />
+                )}
+                <span
+                  className={
+                    step.pending
+                      ? "min-w-0 flex-1 font-medium"
+                      : "min-w-0 flex-1 text-muted-foreground"
+                  }
+                >
+                  {step.text}
+                </span>
+                {step.durationMs !== undefined ? (
+                  <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                    {formatStepDuration(step.durationMs)}
+                  </span>
+                ) : step.pending ? (
+                  <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                    {formatStepDuration(elapsedMs - (step.startedAt - startTimeRef.current))}
+                  </span>
+                ) : null}
+              </div>
+              {step.pending && step.id === "extract" ? (
+                <p
+                  className="ml-6 text-xs text-muted-foreground"
+                  aria-live="polite"
+                >
+                  {EXTRACT_HINTS[hintIndex % EXTRACT_HINTS.length]}
+                </p>
+              ) : null}
             </li>
           ))}
         </ol>
