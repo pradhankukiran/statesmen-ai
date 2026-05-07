@@ -1,0 +1,52 @@
+[
+  {
+    "id": 1423,
+    "name": "Boris Johnson",
+    "party": "Conservative",
+    "partyColor": "#0063ba",
+    "house": "Commons",
+    "term": "2019–2022",
+    "tagline": "Brexit-era PM",
+    "photoUrl": "https://members-api.parliament.uk/api/Members/1423/Portrait?cropType=ThreeFour"
+  },
+  {
+    "id": 4514,
+    "name": "Keir Starmer",
+    "party": "Labour",
+    "partyColor": "#dc241f",
+    "house": "Commons",
+    "term": "2024–",
+    "tagline": "Current PM",
+    "photoUrl": "https://members-api.parliament.uk/api/Members/4514/Portrait?cropType=ThreeFour"
+  },
+  {
+    "id": 4483,
+    "name": "Rishi Sunak",
+    "party": "Conservative",
+    "partyColor": "#0063ba",
+    "house": "Commons",
+    "term": "2022–2024",
+    "tagline": "Banker turned PM",
+    "photoUrl": "https://members-api.parliament.uk/api/Members/4483/Portrait?cropType=ThreeFour"
+  },
+  {
+    "id": 4097,
+    "name": "Liz Truss",
+    "party": "Conservative",
+    "partyColor": "#0063ba",
+    "house": "Commons",
+    "term": "2022",
+    "tagline": "49-day premiership",
+    "photoUrl": "https://members-api.parliament.uk/api/Members/4097/Portrait?cropType=ThreeFour"
+  },
+  {
+    "id": 1467,
+    "name": "Theresa May",
+    "party": "Conservative",
+    "partyColor": "#0063ba",
+    "house": "Commons",
+    "term": "2016–2019",
+    "tagline": "Brexit PM",
+    "photoUrl": "https://members-api.parliament.uk/api/Members/1467/Portrait?cropType=ThreeFour"
+  }
+]
