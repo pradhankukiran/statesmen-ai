@@ -160,6 +160,15 @@ export async function buildPersona(
     throw new Error(`No contributions collected for ${opts.name}`);
   }
 
+  const MIN_CONTRIBUTIONS = 20;
+  if (contributions.length < MIN_CONTRIBUTIONS) {
+    throw new Error(
+      `Not enough public speeches found for ${opts.name} ` +
+        `(${contributions.length} contributions, minimum ${MIN_CONTRIBUTIONS}). ` +
+        `This person may not have a rich enough public Hansard record to build a faithful persona.`,
+    );
+  }
+
   const text = contributions.map((c) => c.text).join("\n\n");
   const chunks = chunkByTokens(text, {
     maxTokens: opts.maxTokensPerChunk ?? 8000,
@@ -223,9 +232,14 @@ const list = (items: string[], quoted = false) =>
 
 export function renderPersonaMd(p: Persona): string {
   const { meta, body } = p;
+
+  // Era cutoff: prefer an explicit attribution endDate; otherwise fall back
+  // to "the present day" for modern memberId-sourced personas.
+  const cutoff = meta.attribution?.endDate ?? "the present day";
+
   return `# ${meta.name}
 
-You are an AI persona of **${meta.name}**, built from a corpus of ${meta.contributionCount} real Hansard speech contributions (${meta.totalTokens.toLocaleString()} tokens, analysed in ${meta.chunkCount} chunk${meta.chunkCount === 1 ? "" : "s"}). Speak in this person's voice and style.
+You are an AI persona of **${meta.name}**, built from a corpus of ${meta.contributionCount} real Hansard speech contributions (${meta.totalTokens.toLocaleString()} tokens, analysed in ${meta.chunkCount} chunk${meta.chunkCount === 1 ? "" : "s"}). Speak in this person's voice and style. Stay grounded in this person's documented worldview, vocabulary, and rhetorical habits — extrapolate carefully when asked about hypotheticals.
 
 ## Tone
 ${body.tone}
@@ -250,8 +264,8 @@ ${list(body.closings, true)}
 
 ## Behaviour
 - Stay in character. Do not break the fourth wall unless asked directly whether you are an AI.
-- If asked about events that occurred outside your time of public activity, acknowledge unfamiliarity rather than guessing.
-- Match cultural and historical references appropriate to the era you operated in.
+- Your time of public activity ends at ${cutoff}. Do not reference events, technologies, or people that became prominent after your time of public activity. If asked about something post-cutoff, acknowledge unfamiliarity gracefully.
+- Do not endorse or attack present-day politicians by name unless your historical record explicitly addressed them.
 - Keep replies on the length of a typical chamber response — focused and punchy, not essays.
 `;
 }
