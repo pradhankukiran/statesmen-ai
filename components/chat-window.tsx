@@ -12,7 +12,7 @@ import {
 } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { ArrowUp, Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -383,55 +383,40 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
       >
         <form
           onSubmit={handleSubmit}
-          className="mx-auto flex w-full max-w-3xl items-stretch gap-2 px-4 sm:px-6"
+          className="mx-auto w-full max-w-3xl px-4 sm:px-6"
         >
-          <div className="relative flex-1">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={`Message ${name}…`}
-              aria-label={`Message ${name}`}
-              rows={1}
-              autoFocus
-              className={cn(
-                // Bigger, squarer, bolder. Mirrors the SearchBar input on the
-                // landing page in size + weight, but with a heavier border
-                // since brutalism wants edges to read.
-                "block w-full resize-none rounded-md border-2 border-input bg-background px-4 py-3 text-base leading-relaxed",
-                "outline-none transition-colors placeholder:text-muted-foreground",
-                // Brand-yellow only appears in the focus ring — neutral at rest.
-                "focus-visible:border-foreground focus-visible:ring-3 focus-visible:ring-brand/50",
-                "disabled:cursor-not-allowed disabled:opacity-60",
-              )}
-              style={{ maxHeight: 220 }}
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={isBusy || input.trim().length === 0}
-            aria-label="Send"
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={`Message ${name}…`}
+            aria-label={`Message ${name}`}
+            rows={1}
+            autoFocus
+            disabled={isBusy}
             className={cn(
-              // Flat brand-yellow square block. Sharp corners, heavy border to
-              // match the textarea's weight. Hover slightly darkens; disabled
-              // collapses to muted.
-              "flex shrink-0 items-center justify-center self-end rounded-md border-2 border-foreground bg-brand text-brand-foreground transition-colors",
-              "h-[3.25rem] w-[3.25rem]",
-              "hover:bg-brand/85 active:translate-y-px",
-              "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand/50",
-              "disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground",
+              // Bigger, squarer, bolder. Mirrors the SearchBar input on the
+              // landing page in size + weight, but with a heavier border
+              // since brutalism wants edges to read.
+              "block w-full resize-none rounded-md border-2 border-input bg-background px-4 py-3 text-base leading-relaxed",
+              "outline-none transition-colors placeholder:text-muted-foreground",
+              // Brand-yellow only appears in the focus ring — neutral at rest.
+              "focus-visible:border-foreground focus-visible:ring-3 focus-visible:ring-brand/50",
+              "disabled:cursor-not-allowed disabled:opacity-60",
             )}
-          >
-            {isBusy ? (
-              <Loader2 className="size-5 animate-spin" aria-hidden />
-            ) : (
-              <ArrowUp className="size-5" aria-hidden strokeWidth={2.5} />
-            )}
-          </button>
+            style={{ maxHeight: 220 }}
+          />
         </form>
         <p className="mx-auto mt-3 max-w-3xl px-4 text-center text-xs uppercase tracking-widest text-muted-foreground sm:px-6">
-          AI-generated. Not actual statements by {name}.
+          {isBusy ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="size-3 animate-spin" aria-hidden />
+              {name} is writing…
+            </span>
+          ) : (
+            <>Press Enter to send · Shift+Enter for newline · AI-generated, not actual statements by {name}.</>
+          )}
         </p>
       </div>
     </div>
