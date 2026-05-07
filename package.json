@@ -12,8 +12,10 @@
     "script:build": "tsx scripts/test-build.ts"
   },
   "dependencies": {
+    "@ai-sdk/groq": "^3.0.38",
     "@base-ui/react": "^1.4.1",
     "@openrouter/ai-sdk-provider": "^2.9.0",
+    "@vercel/blob": "^2.3.3",
     "ai": "^6.0.175",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
