@@ -1,45 +1,47 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+
+// ─── Loading skeleton ─────────────────────────────────────────────────────────
+//
+// Mirrors the brutalist layout of the live BuildProgress component: a yellow
+// pill, an oversized headline, a small uppercase status accent line, and a
+// bordered step panel with sharp corners. No card chrome.
 
 export default function BuildLoading() {
   return (
-    <div className="mx-auto w-full max-w-2xl px-6 py-12 sm:py-16">
-      <Card>
-        <CardContent className="flex flex-col gap-6 p-6 sm:p-8">
-          <header className="flex flex-col gap-2">
-            <Skeleton className="h-5 w-36" />
-            <Skeleton className="h-8 w-3/5 sm:h-9" />
-            <div className="flex flex-col gap-1.5 pt-1">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-11/12" />
-              <Skeleton className="h-4 w-3/4" />
-            </div>
-          </header>
-
-          <div className="flex flex-col gap-3 border-l border-border pl-5">
-            <div className="flex items-center gap-2">
-              <Skeleton className="size-4 rounded-full" />
-              <Skeleton className="h-4 w-2/3" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="size-4 rounded-full" />
-              <Skeleton className="h-4 w-1/2" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="size-4 rounded-full" />
-              <Skeleton className="h-4 w-3/5" />
-            </div>
+    <div className="mx-auto w-full max-w-3xl px-6 py-16 sm:py-24">
+      <div className="flex flex-col items-start">
+        <header className="flex w-full flex-col items-start">
+          <span className="mb-8 inline-block bg-brand px-3 py-1 text-xs font-semibold uppercase tracking-widest text-brand-foreground">
+            Building persona
+          </span>
+          <Skeleton className="h-12 w-3/4 rounded-md sm:h-14" />
+          <div className="mt-4 flex w-full flex-col gap-2">
+            <Skeleton className="h-3 w-48 rounded-md" />
           </div>
-
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-3 w-10" />
-            </div>
-            <Skeleton className="h-1.5 w-full rounded-full" />
+          <div className="mt-6 flex w-full flex-col gap-2">
+            <Skeleton className="h-5 w-full rounded-md" />
+            <Skeleton className="h-5 w-11/12 rounded-md" />
+            <Skeleton className="h-5 w-3/4 rounded-md" />
           </div>
-        </CardContent>
-      </Card>
+        </header>
+
+        <ol className="mt-10 flex w-full flex-col divide-y-2 divide-border rounded-md border-2 border-foreground bg-background">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="flex items-center gap-3 px-5 py-4">
+              <Skeleton className="size-4 rounded-full" />
+              <Skeleton className="h-4 w-2/3 rounded-md" />
+            </li>
+          ))}
+        </ol>
+
+        <div className="mt-8 flex w-full flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-3 w-32 rounded-md" />
+            <Skeleton className="h-3 w-12 rounded-md" />
+          </div>
+          <div className="h-3 w-full rounded-md border-2 border-foreground bg-background" />
+        </div>
+      </div>
     </div>
   );
 }

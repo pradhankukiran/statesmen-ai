@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 // ─── SSE event shape (mirrors lib/persona.ts BuildEvent + route additions) ────
 
@@ -214,6 +213,8 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
     setErrorMessage(null);
     setSteps([]);
     setExtractProgress(null);
+    setElapsedMs(0);
+    startTimeRef.current = Date.now();
 
     try {
       // Build the request body. The `/api/persona/build` route accepts either
@@ -314,7 +315,6 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    startTimeRef.current = Date.now();
     void startBuild();
   }, [startBuild]);
 
@@ -345,152 +345,184 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
     void startBuild();
   }, [startBuild]);
 
+  // ─── Render ────────────────────────────────────────────────────────────────
+  //
+  // Brutalist-with-brand-yellow language to match the landing/profile/chat
+  // pages: yellow accent pill at top, oversized confident headline, a small
+  // uppercase tracking-widest accent line for status (cold build · elapsed),
+  // then a bordered step panel and a brutalist progress bar. No card chrome,
+  // no soft corners.
+
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-6 p-6 sm:p-8">
-        <header className="flex flex-col gap-2">
-          <span className="inline-flex w-fit items-center bg-brand px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-widest text-brand-foreground">
-            Building persona
-          </span>
-          <h1 className="text-balance text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
-            Building {name}…
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            This only happens once. Future visitors get instant chat. Cold
-            builds typically run 30–120 seconds; free-tier LLMs sometimes
-            stretch that to 2–3 minutes.
-          </p>
-          {phase === "running" || phase === "done" ? (
-            <div className="mt-1 flex items-center gap-3 text-xs uppercase tracking-widest text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  className={
-                    phase === "running"
-                      ? "size-1.5 animate-pulse rounded-full bg-brand"
-                      : "size-1.5 rounded-full bg-brand"
-                  }
-                  aria-hidden
-                />
-                Elapsed
-              </span>
+    <div className="flex flex-col items-start">
+      {/* ─ Hero band: pill + headline + status accent + supporting copy ──── */}
+      <header className="flex w-full flex-col items-start">
+        <span className="mb-8 inline-block bg-brand px-3 py-1 text-xs font-semibold uppercase tracking-widest text-brand-foreground">
+          Building persona
+        </span>
+
+        <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl">
+          Building {name}…
+        </h1>
+
+        {phase === "running" || phase === "done" ? (
+          <div className="mt-4 flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <span>Cold build</span>
+            <span aria-hidden className="text-foreground/30">
+              ·
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span
+                className={cn(
+                  "size-1.5 rounded-full bg-brand",
+                  phase === "running" && "animate-pulse",
+                )}
+                aria-hidden
+              />
+              Elapsed
               <span className="font-mono tabular-nums text-foreground">
                 {formatDuration(elapsedMs)}
               </span>
-            </div>
-          ) : null}
-        </header>
+            </span>
+          </div>
+        ) : null}
 
-        <ol className="flex flex-col gap-2 border-l border-border pl-5">
-          {steps.length === 0 && phase === "running" ? (
-            <li className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin text-brand" aria-hidden />
-              <span>Starting…</span>
-            </li>
-          ) : null}
-          {steps.map((step) => (
-            <li
-              key={step.id}
-              className="flex flex-col gap-1 text-sm"
-              aria-current={step.pending ? "step" : undefined}
-            >
-              <div className="flex items-start gap-2">
-                {step.pending ? (
-                  <Loader2
-                    className="mt-0.5 size-4 shrink-0 animate-spin text-brand"
-                    aria-hidden
-                  />
-                ) : (
-                  <CheckCircle2
-                    className="mt-0.5 size-4 shrink-0 text-brand"
-                    aria-hidden
-                  />
+        <p className="mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg">
+          This only happens once. Future visitors get instant chat. Cold builds
+          typically run 30–120 seconds; free-tier LLMs sometimes stretch that
+          to 2–3 minutes.
+        </p>
+      </header>
+
+      {/* ─ Step panel: bordered rectangle, sharp corners. Each row gets real
+         breathing room and a clear icon / label / duration split. */}
+      <ol className="mt-10 flex w-full flex-col divide-y-2 divide-border rounded-md border-2 border-foreground bg-background">
+        {steps.length === 0 && phase === "running" ? (
+          <li className="flex items-center gap-3 px-5 py-4 text-base">
+            <Loader2 className="size-4 shrink-0 animate-spin text-brand" aria-hidden />
+            <span className="text-muted-foreground">Starting…</span>
+          </li>
+        ) : null}
+        {steps.map((step) => (
+          <li
+            key={step.id}
+            className="flex flex-col gap-1.5 px-5 py-4"
+            aria-current={step.pending ? "step" : undefined}
+          >
+            <div className="flex items-start gap-3 text-base">
+              {step.pending ? (
+                <Loader2
+                  className="mt-[3px] size-4 shrink-0 animate-spin text-brand"
+                  aria-hidden
+                />
+              ) : (
+                <CheckCircle2
+                  className="mt-[3px] size-4 shrink-0 text-brand"
+                  aria-hidden
+                />
+              )}
+              <span
+                className={cn(
+                  "min-w-0 flex-1 leading-snug",
+                  step.pending
+                    ? "font-semibold text-foreground"
+                    : "text-muted-foreground",
                 )}
-                <span
-                  className={
-                    step.pending
-                      ? "min-w-0 flex-1 font-medium"
-                      : "min-w-0 flex-1 text-muted-foreground"
-                  }
-                >
-                  {step.text}
-                </span>
-                {step.durationMs !== undefined ? (
-                  <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
-                    {formatStepDuration(step.durationMs)}
-                  </span>
-                ) : step.pending ? (
-                  <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
-                    {formatStepDuration(elapsedMs - (step.startedAt - startTimeRef.current))}
-                  </span>
-                ) : null}
-              </div>
-              {step.pending && step.id === "extract" ? (
-                <p
-                  className="ml-6 text-xs text-muted-foreground"
-                  aria-live="polite"
-                >
-                  {EXTRACT_HINTS[hintIndex % EXTRACT_HINTS.length]}
-                </p>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-
-        {extractProgress && extractProgress.total > 0 ? (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between text-xs uppercase tracking-widest text-muted-foreground">
-              <span>Chunks analysed</span>
-              <span className="tabular-nums">
-                {Math.min(extractProgress.done, extractProgress.total)} /{" "}
-                {extractProgress.total}
+              >
+                {step.text}
               </span>
+              {step.durationMs !== undefined ? (
+                <span className="shrink-0 font-mono text-xs uppercase tracking-widest tabular-nums text-muted-foreground">
+                  {formatStepDuration(step.durationMs)}
+                </span>
+              ) : step.pending ? (
+                <span className="shrink-0 font-mono text-xs uppercase tracking-widest tabular-nums text-muted-foreground">
+                  {formatStepDuration(elapsedMs - (step.startedAt - startTimeRef.current))}
+                </span>
+              ) : null}
             </div>
+            {step.pending && step.id === "extract" ? (
+              <p
+                className="ml-7 text-sm text-muted-foreground"
+                aria-live="polite"
+              >
+                {EXTRACT_HINTS[hintIndex % EXTRACT_HINTS.length]}
+              </p>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+
+      {/* ─ Brutalist progress bar: bordered rectangle, brand-yellow fill,
+         tracking-widest accent label. Sits below the step panel as the
+         primary "how far are we" affordance. */}
+      {extractProgress && extractProgress.total > 0 ? (
+        <div className="mt-8 flex w-full flex-col gap-3">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <span>Chunks analysed</span>
+            <span className="font-mono tabular-nums text-foreground">
+              {Math.min(extractProgress.done, extractProgress.total)} /{" "}
+              {extractProgress.total}
+            </span>
+          </div>
+          <div
+            className="h-3 w-full overflow-hidden rounded-md border-2 border-foreground bg-background"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={extractProgress.total}
+            aria-valuenow={Math.min(
+              extractProgress.done,
+              extractProgress.total,
+            )}
+          >
             <div
-              className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={extractProgress.total}
-              aria-valuenow={Math.min(
-                extractProgress.done,
-                extractProgress.total,
+              className="h-full bg-brand transition-[width] duration-300"
+              style={{
+                width: `${
+                  (Math.min(extractProgress.done, extractProgress.total) /
+                    extractProgress.total) *
+                  100
+                }%`,
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {/* ─ Error state: bordered destructive panel + brutalist primary retry
+         button matching the chat-cta pattern. */}
+      {phase === "error" ? (
+        <div className="mt-10 flex w-full flex-col gap-5 rounded-md border-2 border-destructive bg-destructive/5 p-5 sm:p-6">
+          <div className="flex items-start gap-3">
+            <TriangleAlert
+              className="mt-[3px] size-5 shrink-0 text-destructive"
+              aria-hidden
+            />
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs font-semibold uppercase tracking-widest text-destructive">
+                Build failed
+              </p>
+              <p className="text-base text-foreground">
+                {errorMessage ?? "Unknown error."}
+              </p>
+            </div>
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={handleRetry}
+              className={cn(
+                "inline-flex items-center gap-3 rounded-md border-2 border-foreground bg-brand px-6 py-3 text-base font-semibold text-brand-foreground",
+                "cursor-pointer transition-colors hover:bg-brand/85 active:translate-y-px",
+                "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand",
               )}
             >
-              <div
-                className="h-full bg-brand transition-[width] duration-300"
-                style={{
-                  width: `${
-                    (Math.min(extractProgress.done, extractProgress.total) /
-                      extractProgress.total) *
-                    100
-                  }%`,
-                }}
-              />
-            </div>
+              <RefreshCw className="size-5" aria-hidden />
+              Try again
+            </button>
           </div>
-        ) : null}
-
-        {phase === "error" ? (
-          <div className="flex flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-            <div className="flex items-start gap-2">
-              <TriangleAlert
-                className="mt-0.5 size-4 shrink-0 text-destructive"
-                aria-hidden
-              />
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium text-destructive">
-                  Build failed.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {errorMessage ?? "Unknown error."}
-                </p>
-              </div>
-            </div>
-            <div>
-              <Button onClick={handleRetry}>Try again</Button>
-            </div>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+        </div>
+      ) : null}
+    </div>
   );
 }

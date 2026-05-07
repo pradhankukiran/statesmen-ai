@@ -2,8 +2,6 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { BuildProgress, type BuildAttribution } from "@/components/build-progress";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { getMember } from "@/lib/members";
 import { getPopularPMBySlug } from "@/lib/popular";
 
@@ -44,7 +42,8 @@ export const metadata: Metadata = {
 //     config sourced from the registry. This is how Thatcher & Churchill
 //     reach attribution-mode builds.
 //
-// If neither path resolves we render a malformed-URL card.
+// If neither path resolves we render a malformed-URL state in the same
+// brutalist language as the rest of the site.
 
 export default async function BuildPage({
   params,
@@ -69,7 +68,7 @@ export default async function BuildPage({
       name = slug;
     }
     return (
-      <div className="mx-auto w-full max-w-2xl px-6 py-12 sm:py-16">
+      <div className="mx-auto w-full max-w-3xl px-6 py-16 sm:py-24">
         <BuildProgress slug={slug} name={name} memberId={memberId} />
       </div>
     );
@@ -85,7 +84,7 @@ export default async function BuildPage({
       searchTerms: pm.attribution.searchTerms,
     };
     return (
-      <div className="mx-auto w-full max-w-2xl px-6 py-12 sm:py-16">
+      <div className="mx-auto w-full max-w-3xl px-6 py-16 sm:py-24">
         <BuildProgress slug={slug} name={pm.name} attribution={attribution} />
       </div>
     );
@@ -93,18 +92,25 @@ export default async function BuildPage({
 
   // ─── Fallback: neither path applies ───────────────────────────────────────
   return (
-    <div className="mx-auto w-full max-w-2xl px-6 py-16 sm:py-24">
-      <Card>
-        <CardContent className="flex flex-col items-start gap-4 p-6 sm:p-8">
-          <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
-            Build URL is malformed.
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            This build URL is malformed. Return to homepage.
-          </p>
-          <Button render={<Link href="/" />}>Return to homepage</Button>
-        </CardContent>
-      </Card>
+    <div className="mx-auto w-full max-w-3xl px-6 py-16 sm:py-24">
+      <div className="flex flex-col items-start">
+        <span className="mb-8 inline-block bg-brand px-3 py-1 text-xs font-semibold uppercase tracking-widest text-brand-foreground">
+          Malformed URL
+        </span>
+        <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl">
+          This build URL is malformed.
+        </h1>
+        <p className="mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg">
+          The build URL we received doesn&apos;t map to a known persona. Head
+          back to the homepage and pick a Prime Minister to start from.
+        </p>
+        <Link
+          href="/"
+          className="mt-10 inline-flex items-center gap-3 rounded-md border-2 border-foreground bg-brand px-6 py-3 text-base font-semibold text-brand-foreground transition-colors hover:bg-brand/85 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+        >
+          Return to homepage
+        </Link>
+      </div>
     </div>
   );
 }
