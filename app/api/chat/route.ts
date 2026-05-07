@@ -18,6 +18,9 @@ import { getPersona, type CachedPersona } from "@/lib/cache";
 import type { PersonaExamplesFile } from "@/lib/persona";
 
 export const runtime = "nodejs";
+// Streaming Groq replies are typically a few seconds, but we leave headroom
+// for slow first-token starts on the free tier.
+export const maxDuration = 60;
 
 // ─── Request shape ────────────────────────────────────────────────────────────
 

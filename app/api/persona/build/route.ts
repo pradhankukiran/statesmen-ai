@@ -7,6 +7,11 @@ import {
 } from "@/lib/persona";
 
 export const runtime = "nodejs";
+// Free-tier OpenRouter models can take 60–120s per LLM call; with 5-model
+// fallback × extract + merge stages, the cold-build pipeline can legitimately
+// run 5+ minutes. Vercel Hobby (Fluid Compute) max is 800s; pick a generous
+// cap that won't truncate a real build.
+export const maxDuration = 300;
 
 // ─── Request schema ───────────────────────────────────────────────────────────
 
