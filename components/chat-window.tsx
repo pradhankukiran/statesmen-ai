@@ -45,7 +45,9 @@ function messageText(message: UIMessage): string {
 }
 
 // Markdown render config — minimal: no images, no raw HTML, links open in a new
-// tab. Lists/bold/italic/code render with brand-consistent typography.
+// tab. Lists/bold/italic/code render with brand-consistent typography. Sized to
+// match the landing-page's body copy (text-base/text-lg) so prose feels
+// substantial, not chat-app-cramped.
 const markdownComponents: Components = {
   a: ({ children, href }) => (
     <a
@@ -58,17 +60,17 @@ const markdownComponents: Components = {
     </a>
   ),
   p: ({ children }) => (
-    <p className="whitespace-pre-wrap leading-relaxed [&:not(:last-child)]:mb-3">
+    <p className="whitespace-pre-wrap leading-relaxed [&:not(:last-child)]:mb-4">
       {children}
     </p>
   ),
   ul: ({ children }) => (
-    <ul className="my-3 list-disc space-y-1 pl-5 marker:text-muted-foreground">
+    <ul className="my-4 list-disc space-y-1.5 pl-6 marker:text-muted-foreground">
       {children}
     </ul>
   ),
   ol: ({ children }) => (
-    <ol className="my-3 list-decimal space-y-1 pl-5 marker:text-muted-foreground">
+    <ol className="my-4 list-decimal space-y-1.5 pl-6 marker:text-muted-foreground">
       {children}
     </ol>
   ),
@@ -78,30 +80,34 @@ const markdownComponents: Components = {
   ),
   em: ({ children }) => <em className="italic">{children}</em>,
   code: ({ children }) => (
-    <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">
+    <code className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[0.85em]">
       {children}
     </code>
   ),
   blockquote: ({ children }) => (
-    <blockquote className="my-3 border-l-2 border-brand pl-4 text-muted-foreground italic">
+    <blockquote className="my-4 border-l-2 border-brand pl-4 italic text-muted-foreground">
       {children}
     </blockquote>
   ),
-  hr: () => <hr className="my-4 border-border" />,
+  hr: () => <hr className="my-6 border-border" />,
   // Strip headings down to a sensible default — chamber answers occasionally
   // include them but they shouldn't dominate the bubble.
   h1: ({ children }) => (
-    <p className="mb-2 text-base font-semibold tracking-tight">{children}</p>
+    <p className="mb-2 text-lg font-semibold tracking-tight">{children}</p>
   ),
   h2: ({ children }) => (
-    <p className="mb-2 text-base font-semibold tracking-tight">{children}</p>
+    <p className="mb-2 text-lg font-semibold tracking-tight">{children}</p>
   ),
   h3: ({ children }) => (
-    <p className="mb-2 text-sm font-semibold tracking-tight">{children}</p>
+    <p className="mb-2 text-base font-semibold tracking-tight">{children}</p>
   ),
 };
 
 // ─── Persona avatar (used in header + next to assistant messages) ────────────
+//
+// Sized up vs. earlier passes so it carries weight next to the larger
+// type. Square-ish ring (1px) keeps it visually crisp without competing with
+// the brutalist accent boxes elsewhere on the page.
 
 function PersonaAvatar({
   name,
@@ -110,10 +116,12 @@ function PersonaAvatar({
 }: {
   name: string;
   photoUrl?: string;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
 }) {
-  const dim = size === "sm" ? "size-8" : "size-11";
-  const text = size === "sm" ? "text-xs" : "text-sm";
+  const dim =
+    size === "sm" ? "size-9" : size === "lg" ? "size-14" : "size-12";
+  const text =
+    size === "sm" ? "text-xs" : size === "lg" ? "text-base" : "text-sm";
   return (
     <div
       className={cn(
@@ -223,10 +231,9 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    // Enter sends; Shift+Enter inserts a newline. Only on non-mobile-ish — on
-    // small screens the on-screen keyboard's "return" usually maps to Enter
-    // and users expect newline insertion, so we only intercept when shift is
-    // not held.
+    // Enter sends; Shift+Enter inserts a newline. The IME composition guard
+    // prevents premature send while a user is mid-composition (Japanese,
+    // Chinese, etc.).
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       submit(input);
@@ -240,7 +247,7 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    const next = Math.min(el.scrollHeight, 200);
+    const next = Math.min(el.scrollHeight, 220);
     el.style.height = `${next}px`;
   }, [input]);
 
@@ -251,10 +258,10 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
   return (
     <div className="mx-auto flex min-h-[calc(100svh-5rem)] w-full max-w-3xl flex-col px-4 sm:px-6">
       {/* ─ Persona header ─────────────────────────────────────────────────── */}
-      <header className="flex items-center gap-3 border-b border-border/60 py-5 sm:py-6">
-        <PersonaAvatar name={name} photoUrl={photoUrl} />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <h1 className="truncate text-base font-semibold leading-tight tracking-tight sm:text-lg">
+      <header className="flex items-center gap-4 border-b-2 border-border py-6 sm:py-8">
+        <PersonaAvatar name={name} photoUrl={photoUrl} size="lg" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <h1 className="truncate text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
             {name}
           </h1>
           <p className="text-xs uppercase tracking-widest text-muted-foreground">
@@ -265,7 +272,7 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
 
       {/* ─ Conversation ───────────────────────────────────────────────────── */}
       {hasMessages ? (
-        <ol className="flex flex-col gap-6 py-8">
+        <ol className="flex flex-col gap-8 py-10 sm:py-12">
           {messages.map((message) => {
             const text = messageText(message);
             const isUser = message.role === "user";
@@ -275,7 +282,7 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
             if (isUser) {
               return (
                 <li key={message.id} className="flex justify-end">
-                  <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-md bg-muted px-4 py-2.5 text-sm leading-relaxed text-foreground sm:max-w-[80%]">
+                  <div className="max-w-[85%] whitespace-pre-wrap rounded-md border-2 border-border bg-muted px-5 py-3 text-base leading-relaxed text-foreground sm:max-w-[80%]">
                     {text}
                   </div>
                 </li>
@@ -286,15 +293,15 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
               !isUser && status === "streaming" && message === messages[messages.length - 1];
 
             return (
-              <li key={message.id} className="flex items-start gap-3">
+              <li key={message.id} className="flex items-start gap-4">
                 <PersonaAvatar name={name} photoUrl={photoUrl} size="sm" />
                 <div
-                  className="min-w-0 flex-1 pt-0.5 text-sm leading-relaxed text-foreground"
+                  className="min-w-0 flex-1 py-1 text-base leading-relaxed text-foreground sm:text-lg"
                   aria-busy={isStreaming || undefined}
                 >
                   {isPendingAssistant ? (
                     <span className="inline-flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
                       Thinking…
                     </span>
                   ) : (
@@ -316,22 +323,22 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
              and the in-bubble pending state takes over. */}
           {status === "submitted" &&
           messages[messages.length - 1]?.role === "user" ? (
-            <li className="flex items-start gap-3">
+            <li className="flex items-start gap-4">
               <PersonaAvatar name={name} photoUrl={photoUrl} size="sm" />
               <div
-                className="flex min-w-0 flex-1 items-center gap-2 pt-0.5 text-sm leading-relaxed text-muted-foreground"
+                className="flex min-w-0 flex-1 items-center gap-2 py-1 text-base leading-relaxed text-muted-foreground sm:text-lg"
                 aria-live="polite"
               >
-                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                <Loader2 className="size-4 animate-spin" aria-hidden />
                 Thinking…
               </div>
             </li>
           ) : null}
 
           {error ? (
-            <li className="flex items-start gap-3" role="alert">
+            <li className="flex items-start gap-4" role="alert">
               <PersonaAvatar name={name} photoUrl={photoUrl} size="sm" />
-              <div className="flex min-w-0 flex-1 flex-col gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+              <div className="flex min-w-0 flex-1 flex-col gap-3 rounded-md border-2 border-destructive/40 bg-destructive/5 px-5 py-4 text-base">
                 <p className="text-destructive">
                   {error.message || "Something went wrong. Please try again."}
                 </p>
@@ -370,13 +377,13 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
          while content scrolls beneath it. */}
       <div
         className={cn(
-          "sticky bottom-0 z-10 -mx-4 mt-auto bg-background pb-3 pt-2 sm:-mx-6 sm:pb-4",
-          "before:pointer-events-none before:absolute before:-top-6 before:left-0 before:right-0 before:h-6 before:bg-gradient-to-b before:from-transparent before:to-background",
+          "sticky bottom-0 z-10 -mx-4 mt-auto bg-background pb-4 pt-3 sm:-mx-6 sm:pb-6",
+          "before:pointer-events-none before:absolute before:-top-8 before:left-0 before:right-0 before:h-8 before:bg-gradient-to-b before:from-transparent before:to-background",
         )}
       >
         <form
           onSubmit={handleSubmit}
-          className="mx-auto flex w-full max-w-3xl items-end gap-2 px-4 sm:px-6"
+          className="mx-auto flex w-full max-w-3xl items-stretch gap-2 px-4 sm:px-6"
         >
           <div className="relative flex-1">
             <textarea
@@ -389,33 +396,41 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
               rows={1}
               autoFocus
               className={cn(
-                "block w-full resize-none rounded-2xl border border-input bg-background px-4 py-3 pr-12 text-sm leading-relaxed",
+                // Bigger, squarer, bolder. Mirrors the SearchBar input on the
+                // landing page in size + weight, but with a heavier border
+                // since brutalism wants edges to read.
+                "block w-full resize-none rounded-md border-2 border-input bg-background px-4 py-3 text-base leading-relaxed",
                 "outline-none transition-colors placeholder:text-muted-foreground",
-                "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40",
+                // Brand-yellow only appears in the focus ring — neutral at rest.
+                "focus-visible:border-foreground focus-visible:ring-3 focus-visible:ring-brand/50",
                 "disabled:cursor-not-allowed disabled:opacity-60",
               )}
-              style={{ maxHeight: 200 }}
+              style={{ maxHeight: 220 }}
             />
-            <Button
-              type="submit"
-              size="icon-sm"
-              disabled={isBusy || input.trim().length === 0}
-              className={cn(
-                "absolute bottom-2 right-2 rounded-full",
-                "bg-brand text-brand-foreground hover:bg-brand/90",
-                "disabled:bg-muted disabled:text-muted-foreground",
-              )}
-              aria-label="Send"
-            >
-              {isBusy ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <ArrowUp className="size-4" aria-hidden />
-              )}
-            </Button>
           </div>
+          <button
+            type="submit"
+            disabled={isBusy || input.trim().length === 0}
+            aria-label="Send"
+            className={cn(
+              // Flat brand-yellow square block. Sharp corners, heavy border to
+              // match the textarea's weight. Hover slightly darkens; disabled
+              // collapses to muted.
+              "flex shrink-0 items-center justify-center self-end rounded-md border-2 border-foreground bg-brand text-brand-foreground transition-colors",
+              "h-[3.25rem] w-[3.25rem]",
+              "hover:bg-brand/85 active:translate-y-px",
+              "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand/50",
+              "disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground",
+            )}
+          >
+            {isBusy ? (
+              <Loader2 className="size-5 animate-spin" aria-hidden />
+            ) : (
+              <ArrowUp className="size-5" aria-hidden strokeWidth={2.5} />
+            )}
+          </button>
         </form>
-        <p className="mx-auto mt-2 max-w-3xl px-4 text-center text-[0.7rem] leading-relaxed text-muted-foreground sm:px-6">
+        <p className="mx-auto mt-3 max-w-3xl px-4 text-center text-xs uppercase tracking-widest text-muted-foreground sm:px-6">
           AI-generated. Not actual statements by {name}.
         </p>
       </div>
@@ -424,6 +439,11 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
 }
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
+//
+// Stripped down to mirror the landing-page hero rhythm: brand-yellow pill,
+// confident headline, supporting paragraph, then a short row of starter
+// rectangles (NOT pills — corners stay sharp). Generous vertical padding so
+// the eye lands on the headline first and the composer second.
 
 function EmptyState({
   name,
@@ -437,21 +457,21 @@ function EmptyState({
   disabled: boolean;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-start justify-center gap-8 py-16 sm:py-24">
-      <div className="flex flex-col gap-3">
-        <span className="inline-flex w-fit items-center bg-brand px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-widest text-brand-foreground">
+    <div className="flex flex-1 flex-col items-start justify-center gap-12 py-16 sm:py-24">
+      <div className="flex flex-col gap-6">
+        <span className="inline-block w-fit bg-brand px-3 py-1 text-xs font-semibold uppercase tracking-widest text-brand-foreground">
           Begin conversation
         </span>
-        <h2 className="text-balance text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+        <h2 className="text-balance text-3xl font-semibold leading-[1.1] tracking-tight sm:text-4xl">
           What would you like to ask {name}?
         </h2>
-        <p className="max-w-xl text-sm text-muted-foreground sm:text-base">
+        <p className="max-w-xl text-base text-muted-foreground sm:text-lg">
           A persona built from real Hansard speeches. Ask anything — about the
           time in office, a policy, a turn of phrase. Or pick a starter.
         </p>
       </div>
 
-      <ul className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <ul className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         {starters.map((starter) => (
           <li key={starter}>
             <button
@@ -459,10 +479,13 @@ function EmptyState({
               onClick={() => onStarter(starter)}
               disabled={disabled}
               className={cn(
-                "rounded-full border border-border bg-background px-4 py-2 text-left text-sm text-foreground",
-                "transition-colors hover:border-foreground/40 hover:bg-muted",
-                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
-                "disabled:cursor-not-allowed disabled:opacity-50",
+                // Brutalist starter chip: bordered rectangle, sharp corners,
+                // hover flips to brand-yellow background with black text.
+                "rounded-md border-2 border-border bg-background px-4 py-3 text-left text-sm font-medium text-foreground sm:text-base",
+                "transition-colors",
+                "hover:border-foreground hover:bg-brand hover:text-brand-foreground",
+                "focus-visible:outline-none focus-visible:border-foreground focus-visible:bg-brand focus-visible:text-brand-foreground",
+                "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-background disabled:hover:text-foreground",
               )}
             >
               {starter}
