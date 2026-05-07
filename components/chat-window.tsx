@@ -395,6 +395,13 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
             rows={1}
             autoFocus
             disabled={isBusy}
+            // Opt out of browser-extension overlays (Grammarly,
+            // LanguageTool, etc.) injecting their own icons into the input.
+            data-gramm="false"
+            data-gramm_editor="false"
+            data-enable-grammarly="false"
+            data-lt-active="false"
+            spellCheck={false}
             className={cn(
               // Bigger, squarer, bolder. Mirrors the SearchBar input on the
               // landing page in size + weight, but with a heavier border
