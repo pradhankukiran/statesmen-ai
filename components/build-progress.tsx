@@ -224,14 +224,17 @@ export function BuildProgress({ slug, name, memberId }: Props) {
 
   // Auto-start once on first mount only. Browser back/forward should NOT
   // re-fire the pipeline.
+  //
+  // No cleanup abort here on purpose: React 19 StrictMode in dev runs effects
+  // mount → cleanup → mount, which would abort the just-dispatched POST before
+  // it leaves the browser. The runIdRef + startedRef guards already prevent
+  // stale state updates and double-fires; an in-flight fetch on real unmount
+  // is allowed to complete (the server-side stream closes naturally when the
+  // client drops the connection).
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     void startBuild();
-
-    return () => {
-      abortRef.current?.abort();
-    };
   }, [startBuild]);
 
   const handleRetry = useCallback(() => {
