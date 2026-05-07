@@ -92,7 +92,7 @@ export function ChatCta({ id, name }: Props) {
           "inline-flex items-center gap-3 rounded-md border-2 border-foreground bg-brand px-6 py-3 text-base font-semibold text-brand-foreground sm:px-8 sm:py-4 sm:text-lg",
           // Tactile press: yellow darkens slightly on hover, button drops
           // 1px on click. No shadow, no soft transition — just edges.
-          "transition-colors hover:bg-brand/85 active:translate-y-px",
+          "cursor-pointer transition-colors hover:bg-brand/85 active:translate-y-px",
           // Brand yellow stays in the focus ring so the affordance reads
           // even on darker backgrounds.
           "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand",

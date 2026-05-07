@@ -51,7 +51,7 @@ export default function ProfileError({ error, reset }: Props) {
           onClick={() => reset()}
           className={cn(
             "inline-flex items-center gap-3 rounded-md border-2 border-foreground bg-brand px-6 py-3 text-base font-semibold text-brand-foreground sm:px-8 sm:py-4 sm:text-lg",
-            "transition-colors hover:bg-brand/85 active:translate-y-px",
+            "cursor-pointer transition-colors hover:bg-brand/85 active:translate-y-px",
             "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand",
           )}
         >

@@ -478,7 +478,7 @@ function EmptyState({
                 // Brutalist starter chip: bordered rectangle, sharp corners,
                 // hover flips to brand-yellow background with black text.
                 "rounded-md border-2 border-border bg-background px-4 py-3 text-left text-sm font-medium text-foreground sm:text-base",
-                "transition-colors",
+                "cursor-pointer transition-colors",
                 "hover:border-foreground hover:bg-brand hover:text-brand-foreground",
                 "focus-visible:outline-none focus-visible:border-foreground focus-visible:bg-brand focus-visible:text-brand-foreground",
                 "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-background disabled:hover:text-foreground",
