@@ -2,7 +2,7 @@ import { z } from "zod";
 import { generateObject } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { EXTRACT_SYSTEM, buildExtractPrompt } from "./prompts/extract";
-import { EXTRACT_MODEL } from "./models";
+import { extractModel } from "./models";
 
 // ─── Output schema (also used as AI SDK structured-output schema) ─────────────
 
@@ -63,7 +63,7 @@ export async function extractStyleFromChunk(
   }
 
   const openrouter = createOpenRouter({ apiKey });
-  const modelId = opts.model ?? EXTRACT_MODEL;
+  const modelId = opts.model ?? extractModel();
 
   const { object } = await generateObject({
     model: openrouter(modelId),

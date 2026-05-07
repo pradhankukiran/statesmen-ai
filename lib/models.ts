@@ -1,27 +1,43 @@
 /**
  * Centralised LLM model identifiers.
  *
- * Each constant is sourced from the environment first, falling back to a
- * sensible default. Resolved once at module load — env is set at server
- * start, not mutated mid-process.
+ * IMPORTANT: these are functions, not constants. Module-level constants
+ * capture `process.env` at import time, which is wrong in two ways:
+ *   - Next.js dev "Reload env" doesn't re-evaluate already-loaded modules,
+ *     so changes to `.env.local` are silently ignored.
+ *   - CLI scripts that call `process.loadEnvFile()` after imports load
+ *     the env *after* the constants were already captured.
+ * Reading env at call time (per-request) avoids both traps.
  *
- * Override in `.env.local` to swap providers/models without code changes:
+ * Override priority for OpenRouter (highest first):
  *
- *   OPENROUTER_EXTRACT_MODEL=anthropic/claude-sonnet-4.5
- *   OPENROUTER_MERGE_MODEL=anthropic/claude-opus-4.5
- *   GROQ_CHAT_MODEL=llama-3.3-70b-versatile
+ *   1. OPENROUTER_EXTRACT_MODEL / OPENROUTER_MERGE_MODEL  (per-stage)
+ *   2. OPENROUTER_MODEL                                   (master — both stages)
+ *   3. baked-in default                                   (claude-sonnet-4.5)
+ *
+ * Simple "use one model for everything":
+ *
+ *   OPENROUTER_MODEL=nvidia/nemotron-3-super-120b-a12b:free
  */
 
-// Per-chunk style extraction (offline, quality-sensitive).
-export const EXTRACT_MODEL: string =
-  process.env.OPENROUTER_EXTRACT_MODEL ?? "anthropic/claude-sonnet-4.5";
+const OPENROUTER_DEFAULT = "anthropic/claude-sonnet-4.5";
+const GROQ_DEFAULT = "llama-3.3-70b-versatile";
 
-// Reduce N chunk extractions to one consolidated persona. Defaults to the
-// extract model so a single override changes both stages, but can be set
-// independently for callers that want a bigger reasoner here.
-export const MERGE_MODEL: string =
-  process.env.OPENROUTER_MERGE_MODEL ?? EXTRACT_MODEL;
+function openrouterFallback(): string {
+  return process.env.OPENROUTER_MODEL ?? OPENROUTER_DEFAULT;
+}
+
+// Per-chunk style extraction (offline, quality-sensitive).
+export function extractModel(): string {
+  return process.env.OPENROUTER_EXTRACT_MODEL ?? openrouterFallback();
+}
+
+// Reduce N chunk extractions to one consolidated persona.
+export function mergeModel(): string {
+  return process.env.OPENROUTER_MERGE_MODEL ?? openrouterFallback();
+}
 
 // Realtime chat with the persona (latency-sensitive).
-export const CHAT_MODEL: string =
-  process.env.GROQ_CHAT_MODEL ?? "llama-3.3-70b-versatile";
+export function chatModel(): string {
+  return process.env.GROQ_CHAT_MODEL ?? GROQ_DEFAULT;
+}

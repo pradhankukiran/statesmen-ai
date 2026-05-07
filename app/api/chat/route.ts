@@ -13,7 +13,7 @@ import {
   streamText,
   type UIMessage,
 } from "ai";
-import { CHAT_MODEL } from "@/lib/models";
+import { chatModel } from "@/lib/models";
 import { getPersona, type CachedPersona } from "@/lib/cache";
 import type { PersonaExamplesFile } from "@/lib/persona";
 
@@ -139,7 +139,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const system = buildSystemPrompt(cached);
-  const model = groq(CHAT_MODEL);
+  const model = groq(chatModel());
 
   const modelMessages = await convertToModelMessages(messages);
 

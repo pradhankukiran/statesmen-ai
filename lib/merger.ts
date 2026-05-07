@@ -3,7 +3,7 @@ import { generateObject } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { MERGE_SYSTEM, buildMergePrompt } from "./prompts/merge";
 import type { Extraction } from "./extractor";
-import { MERGE_MODEL } from "./models";
+import { mergeModel } from "./models";
 
 // ─── Schema for the consolidated persona ──────────────────────────────────────
 
@@ -72,7 +72,7 @@ export async function mergeExtractions(
   }
 
   const openrouter = createOpenRouter({ apiKey });
-  const modelId = opts.model ?? MERGE_MODEL;
+  const modelId = opts.model ?? mergeModel();
 
   const { object } = await generateObject({
     model: openrouter(modelId),
