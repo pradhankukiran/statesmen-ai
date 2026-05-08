@@ -79,6 +79,10 @@ async function callOnce(
     // The merged persona JSON is larger than a single extraction (more
     // examples, deduplicated vocabulary, etc.) but still well under 6k tokens.
     maxOutputTokens: 8000,
+    // The merger's own fallback list handles retry; the SDK's internal
+    // retries just multiply rate-limit pressure on already-throttled
+    // upstreams.
+    maxRetries: 0,
   });
   return object;
 }

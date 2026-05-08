@@ -76,6 +76,13 @@ async function callOnce(
     // for the model's full ceiling — that blocks budget-limited accounts.
     maxOutputTokens: 4000,
     abortSignal,
+    // No retries here. In race mode, the race itself is the retry
+    // mechanism — internal retries waste rate-limit quota on the same
+    // already-throttled upstream provider, take seconds each, and push
+    // toward Vercel's 60s function timeout. In the chunked-fallback
+    // chain, the per-chunk fallback list also handles retry semantics
+    // at a higher level. Either way, one shot per call is correct.
+    maxRetries: 0,
   });
   return object;
 }
