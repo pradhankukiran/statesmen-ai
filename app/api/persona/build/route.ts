@@ -36,7 +36,7 @@ type ParsedRequest = {
   fetch: FetchConfig;
 };
 
-const DEFAULT_MAX = 80;
+const DEFAULT_MAX = 500;
 
 // ─── SSE event union ──────────────────────────────────────────────────────────
 

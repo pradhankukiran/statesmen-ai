@@ -38,6 +38,7 @@ type Step = {
 // Rotating hints shown under the active extract step so the page doesn't
 // look frozen during the slow free-tier LLM call (60-90s per chunk).
 const EXTRACT_HINTS = [
+  "Five free-tier models are racing to finish first…",
   "Extracting vocabulary and pet phrases…",
   "Identifying rhetorical devices…",
   "Pulling verbatim quotes from the chunk…",
@@ -388,9 +389,9 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
         ) : null}
 
         <p className="mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg">
-          This only happens once. Future visitors get instant chat. Cold builds
-          typically run 30–120 seconds; free-tier LLMs sometimes stretch that
-          to 2–3 minutes.
+          This only happens once. Future visitors get instant chat. Five
+          language models race to analyse the speeches in parallel — the
+          fastest valid result wins.
         </p>
       </header>
 
