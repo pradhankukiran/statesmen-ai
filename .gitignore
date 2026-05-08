@@ -57,3 +57,5 @@ data/personas/*.json
 scratch/
 tmp/
 *.local
+.vercel
+.env*.local
