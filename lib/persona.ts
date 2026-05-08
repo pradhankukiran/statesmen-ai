@@ -18,9 +18,22 @@ import {
   type Contribution,
 } from "./hansard";
 import { chunkByTokens, countTokens } from "./chunker";
-import { extractStyleFromChunk } from "./extractor";
+import {
+  extractStyleFromChunk,
+  raceExtractAcrossModels,
+} from "./extractor";
 import { mergeExtractions, type MergedPersona } from "./merger";
 import { getMember } from "./members";
+
+/**
+ * If the full corpus fits within this many tokens, skip chunking + merge
+ * entirely and race all configured extraction models against the full text.
+ * Most free-tier models advertise 128k+ context; 80k leaves comfortable
+ * headroom for the system prompt, schema description, and structured output.
+ * Above 80k, model quality degrades enough that chunking + merge produces
+ * better results anyway.
+ */
+const SINGLE_CALL_THRESHOLD = 80_000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -194,42 +207,68 @@ export async function buildPersona(
   }
 
   const text = contributions.map((c) => c.text).join("\n\n");
-  const chunks = chunkByTokens(text, {
-    maxTokens: opts.maxTokensPerChunk ?? 8000,
-  });
-  const totalTokens = chunks.reduce((s, c) => s + countTokens(c), 0);
-  emit({ type: "chunk_done", chunkCount: chunks.length, totalTokens });
+  const totalTokens = countTokens(text);
 
-  // Parallel extraction across chunks. The startModelIndex rotates each
-  // chunk's preferred model so parallel calls land on different upstream
-  // providers — important for free-tier OpenRouter where each model has
-  // its own thin RPM budget.
-  const extractions = await Promise.all(
-    chunks.map(async (chunk, i) => {
-      emit({
-        type: "extract_start",
-        chunkIndex: i,
-        totalChunks: chunks.length,
-      });
-      const result = await extractStyleFromChunk(opts.name, chunk, {
-        startModelIndex: i,
-      });
-      emit({
-        type: "extract_done",
-        chunkIndex: i,
-        totalChunks: chunks.length,
-      });
-      return result;
-    }),
-  );
+  let body: MergedPersona;
+  let chunkCount: number;
 
-  emit({ type: "merge_start" });
-  // Stagger merge's first-pick model away from chunk 0's, since that
-  // model just took the most recent extraction call.
-  const merged = await mergeExtractions(opts.name, extractions, {
-    startModelIndex: chunks.length,
-  });
-  emit({ type: "merge_done" });
+  if (totalTokens <= SINGLE_CALL_THRESHOLD) {
+    // Race-mode: full corpus fits in one call. Fire all configured
+    // extraction models in parallel against the entire text; first valid
+    // response wins, the others are aborted. The extraction shape is a
+    // strict subset of MergedPersona's, so we skip the merge stage
+    // entirely — extraction IS the persona for this path.
+    chunkCount = 1;
+    emit({ type: "chunk_done", chunkCount, totalTokens });
+    emit({ type: "extract_start", chunkIndex: 0, totalChunks: 1 });
+    const extraction = await raceExtractAcrossModels(opts.name, text);
+    emit({ type: "extract_done", chunkIndex: 0, totalChunks: 1 });
+    // ExtractionSchema and MergedPersonaSchema are structurally compatible
+    // (same field names, same field types — MergedPersona just asks for
+    // larger arrays / longer summary fields). The downstream renderers and
+    // chat system prompt only read field values, so a single-call extraction
+    // can flow through unchanged.
+    body = extraction as MergedPersona;
+  } else {
+    // Chunked fallback (rare path: huge corpora that exceed the single-call
+    // threshold). Walk the existing chunked + merge pipeline.
+    const chunks = chunkByTokens(text, {
+      maxTokens: opts.maxTokensPerChunk ?? 8000,
+    });
+    chunkCount = chunks.length;
+    emit({ type: "chunk_done", chunkCount, totalTokens });
+
+    // Parallel extraction across chunks. The startModelIndex rotates each
+    // chunk's preferred model so parallel calls land on different upstream
+    // providers — important for free-tier OpenRouter where each model has
+    // its own thin RPM budget.
+    const extractions = await Promise.all(
+      chunks.map(async (chunk, i) => {
+        emit({
+          type: "extract_start",
+          chunkIndex: i,
+          totalChunks: chunks.length,
+        });
+        const result = await extractStyleFromChunk(opts.name, chunk, {
+          startModelIndex: i,
+        });
+        emit({
+          type: "extract_done",
+          chunkIndex: i,
+          totalChunks: chunks.length,
+        });
+        return result;
+      }),
+    );
+
+    emit({ type: "merge_start" });
+    // Stagger merge's first-pick model away from chunk 0's, since that
+    // model just took the most recent extraction call.
+    body = await mergeExtractions(opts.name, extractions, {
+      startModelIndex: chunks.length,
+    });
+    emit({ type: "merge_done" });
+  }
 
   emit({ type: "render_done" });
 
@@ -253,11 +292,11 @@ export async function buildPersona(
       endedAt:
         opts.fetch.kind === "memberId" ? member?.endedAt ?? null : undefined,
       contributionCount: contributions.length,
-      chunkCount: chunks.length,
+      chunkCount,
       totalTokens,
       generatedAt: new Date().toISOString(),
     },
-    body: merged,
+    body,
   };
 }
 

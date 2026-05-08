@@ -62,6 +62,7 @@ async function callOnce(
   personName: string,
   chunkText: string,
   temperature: number,
+  abortSignal?: AbortSignal,
 ): Promise<Extraction> {
   const openrouter = createOpenRouter({ apiKey });
   const { object } = await generateObject({
@@ -74,6 +75,7 @@ async function callOnce(
     // OpenRouter pre-charges for the cap, so leave headroom but don't ask
     // for the model's full ceiling — that blocks budget-limited accounts.
     maxOutputTokens: 4000,
+    abortSignal,
   });
   return object;
 }
@@ -112,4 +114,75 @@ export async function extractStyleFromChunk(
         lastError instanceof Error ? lastError.message : String(lastError)
       }`,
   );
+}
+
+// ─── Race-mode extraction ─────────────────────────────────────────────────────
+
+/**
+ * Race the extraction across all configured models in parallel using
+ * `Promise.any`. The first valid `Extraction` wins; the others are aborted
+ * via a shared `AbortController` so we don't keep paying for losing calls.
+ *
+ * Used by `buildPersona` for the typical small-corpus path (≤ ~80k tokens),
+ * where the full text fits in one LLM call. Skips the chunked + merge
+ * pipeline entirely for that case — extraction *is* the persona.
+ *
+ * Throws when every model fails. The error message includes per-model
+ * failure details so the caller can see which models broke and why.
+ */
+export async function raceExtractAcrossModels(
+  personName: string,
+  text: string,
+  opts: ExtractOptions = {},
+): Promise<Extraction> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "OPENROUTER_API_KEY is not set. Add it to .env.local (see .env.example).",
+    );
+  }
+
+  const pool = opts.models && opts.models.length > 0 ? opts.models : extractModels();
+  if (pool.length === 0) {
+    throw new Error("raceExtractAcrossModels: model pool is empty.");
+  }
+  const temperature = opts.temperature ?? 0.2;
+
+  // One controller cancels every losing in-flight request when a winner
+  // emerges. Each branch races its own call; whichever resolves first
+  // signals the rest to bail.
+  const controller = new AbortController();
+  const failures: { model: string; error: string }[] = [];
+
+  const attempts = pool.map((modelId) =>
+    callOnce(apiKey, modelId, personName, text, temperature, controller.signal)
+      .then((result) => {
+        // Cancel the still-pending peers as soon as we have a winner.
+        controller.abort();
+        return result;
+      })
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        failures.push({ model: modelId, error: msg });
+        throw err;
+      }),
+  );
+
+  try {
+    return await Promise.any(attempts);
+  } catch (err) {
+    // `Promise.any` rejects with `AggregateError` when every input rejects.
+    // Surface the per-model failure detail (capped to last 5 to avoid log
+    // floods) so the caller can see which models broke and why.
+    const tail = failures.slice(-5);
+    const detail = tail
+      .map((f) => `  - ${f.model}: ${f.error}`)
+      .join("\n");
+    const aggregate = err instanceof AggregateError ? err : undefined;
+    throw new Error(
+      `Race extraction failed: all ${pool.length} model(s) errored.\n` +
+        `Last ${tail.length} failure(s):\n${detail}` +
+        (aggregate ? "" : `\nNon-aggregate error: ${err instanceof Error ? err.message : String(err)}`),
+    );
+  }
 }
