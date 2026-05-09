@@ -39,11 +39,20 @@ export default function Home() {
           </div>
         </div>
 
-        <ul className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 scroll-px-4 pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin]">
+        {/*
+          Pseudo-element spacers (`before:` / `after:`) provide the leading
+          and trailing 16px gutters. They render as flex children so the
+          browser ALWAYS includes them in scrollWidth — unlike padding-right
+          on a flex+overflow-x-auto container, which several browsers eat
+          when content overflows. Result: identical 16px gap on both ends
+          regardless of scroll position. `scroll-px-4` keeps snap targets
+          inset by the same amount so card-to-card snapping holds the gutter.
+        */}
+        <ul className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-4 pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin] before:block before:w-4 before:shrink-0 before:content-[''] after:block after:w-4 after:shrink-0 after:content-['']">
           {popular.map((pm) => (
             <li
               key={pm.slug}
-              className="w-48 shrink-0 snap-start last:mr-4 sm:w-52 md:w-56 lg:w-60"
+              className="w-48 shrink-0 snap-start sm:w-52 md:w-56 lg:w-60"
             >
               <PersonCard
                 id={pm.kind === "memberId" ? pm.id : pm.slug}
