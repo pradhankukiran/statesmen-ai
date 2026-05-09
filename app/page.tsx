@@ -39,7 +39,7 @@ export default function Home() {
           </div>
         </div>
 
-        <ul className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin]">
+        <ul className="flex snap-x snap-mandatory gap-6 overflow-x-auto px-6 pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin]">
           {popular.map((pm) => (
             <li
               key={pm.slug}
