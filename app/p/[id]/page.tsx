@@ -1,9 +1,102 @@
 import Image from "next/image";
+import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { ChatCta } from "@/components/chat-cta";
 import { Hero } from "@/components/hero";
-import { initials, loadProfile } from "./profile-data";
+import { getMember, getMemberPhotoUrl, type Member } from "@/lib/members";
+import { getPopularPMBySlug, type PopularPM } from "@/lib/popular";
+import { slugify } from "@/lib/slug";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function parsePositiveInt(raw: string): number | null {
+  if (!/^\d+$/.test(raw)) return null;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
+function formatYear(iso: string | null): string | null {
+  if (!iso) return null;
+  const year = iso.slice(0, 4);
+  return /^\d{4}$/.test(year) ? year : null;
+}
+
+function formatTerm(member: Member): string | null {
+  const start = formatYear(member.startedAt);
+  if (!start) return null;
+  const end = formatYear(member.endedAt) ?? "present";
+  if (start === end) return start;
+  return `${start}–${end}`;
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return `${first}${last}`.toUpperCase();
+}
+
+// ─── Profile data ─────────────────────────────────────────────────────────────
+
+type ProfileData = {
+  slug: string;
+  name: string;
+  fullTitle: string | null;
+  party: string | null;
+  partyColor: string | null;
+  house: string;
+  term: string | null;
+  photoUrl: string | null;
+  memberId: number | null;
+  popular: PopularPM | null;
+};
+
+async function loadProfile(rawId: string): Promise<ProfileData> {
+  const numericId = parsePositiveInt(rawId);
+  if (numericId !== null) {
+    let member: Member;
+    try {
+      member = await getMember(numericId);
+    } catch {
+      notFound();
+    }
+    return {
+      slug: slugify(member.name),
+      name: member.name,
+      fullTitle: member.fullTitle,
+      party: member.party,
+      partyColor: member.partyColor,
+      house: member.house,
+      term: formatTerm(member),
+      photoUrl: member.photoUrl,
+      memberId: member.id,
+      popular: null,
+    };
+  }
+
+  const pm = getPopularPMBySlug(rawId);
+  if (pm === undefined) notFound();
+
+  return {
+    slug: pm.slug,
+    name: pm.name,
+    fullTitle: null,
+    party: pm.party,
+    partyColor: pm.partyColor,
+    house: pm.house,
+    term: pm.term,
+    photoUrl:
+      pm.kind === "memberId"
+        ? pm.photoUrl
+        : pm.photoMemberId !== undefined
+          ? getMemberPhotoUrl(pm.photoMemberId)
+          : null,
+    memberId: pm.kind === "memberId" ? pm.id : null,
+    popular: pm,
+  };
+}
 
 // ─── Metadata ─────────────────────────────────────────────────────────────────
 
