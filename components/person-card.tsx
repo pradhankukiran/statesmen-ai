@@ -94,6 +94,12 @@ export function PersonCard({
               fill
               sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, (min-width: 640px) 33vw, 50vw"
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+              // Shared-element name: the profile page sets the same name on
+              // its portrait so the browser morphs the image across the
+              // navigation. `id` here is either a numeric Members API id or
+              // a popular-pms slug — both safe in a CSS ident behind the
+              // `portrait-` prefix (slugs are kebab-cased ASCII).
+              style={{ viewTransitionName: `portrait-${id}` }}
             />
           ) : (
             <div

@@ -168,6 +168,14 @@ export default async function ProfilePage({
                 sizes="(min-width: 768px) 33vw, 100vw"
                 priority
                 className="object-cover"
+                // Shared-element name: must match the value PersonCard sets on
+                // the same portrait. Cards keyed by a numeric Members API id
+                // surface `memberId` here; attribution PMs (Thatcher etc.)
+                // come in via the slug route, where `popular.slug` matches
+                // the URL `id`. Both branches resolve to the card's value.
+                style={{
+                  viewTransitionName: `portrait-${profile.memberId ?? profile.popular?.slug ?? id}`,
+                }}
               />
             </div>
           ) : (
