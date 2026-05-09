@@ -13,11 +13,17 @@
  * The runtime contract is identical across both backends: getters return null
  * when any of the three artefacts is missing, so partial writes never present
  * as a cache hit.
+ *
+ * Writes are transactional in spirit: md + examples are written first, then
+ * meta.json is written last as the "commit marker". A getPersona call that
+ * sees md+examples but no meta therefore reports the cache as a miss, and on
+ * any pre-meta write failure the partial siblings are deleted (best-effort)
+ * to avoid permanent orphaned blobs.
  */
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { head, put } from "@vercel/blob";
+import { del, head, put } from "@vercel/blob";
 import {
   renderPersonaExamples,
   renderPersonaMd,
@@ -55,11 +61,30 @@ function fsPath(slug: string, kind: ArtefactKind): string {
   return path.join(FS_DIR, `${slug}.${EXTS[kind]}`);
 }
 
-function useBlob(): boolean {
+function shouldUseBlob(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
 // ─── Blob backend ─────────────────────────────────────────────────────────────
+
+function isBlobNotFound(err: unknown): boolean {
+  if (
+    err instanceof Error &&
+    /(not\s*found|does\s*not\s*exist)/i.test(err.message)
+  ) {
+    return true;
+  }
+  if (
+    err &&
+    typeof err === "object" &&
+    "name" in err &&
+    typeof (err as { name?: unknown }).name === "string" &&
+    /BlobNotFound/i.test((err as { name: string }).name)
+  ) {
+    return true;
+  }
+  return false;
+}
 
 /** Resolve a stable pathname to a fetchable URL via head(); null if absent. */
 async function blobUrl(pathname: string): Promise<string | null> {
@@ -67,26 +92,7 @@ async function blobUrl(pathname: string): Promise<string | null> {
     const meta = await head(pathname);
     return meta.url;
   } catch (err) {
-    // @vercel/blob throws BlobNotFoundError when the object does not exist.
-    // The runtime message is "The requested blob does not exist." (varies by
-    // SDK version), so match on both 'not found' and 'does not exist' plus
-    // the error class name. We treat any of these as a cache miss; other
-    // errors bubble.
-    if (
-      err instanceof Error &&
-      /(not\s*found|does\s*not\s*exist)/i.test(err.message)
-    ) {
-      return null;
-    }
-    if (
-      err &&
-      typeof err === "object" &&
-      "name" in err &&
-      typeof (err as { name?: unknown }).name === "string" &&
-      /BlobNotFound/i.test((err as { name: string }).name)
-    ) {
-      return null;
-    }
+    if (isBlobNotFound(err)) return null;
     throw err;
   }
 }
@@ -122,25 +128,24 @@ async function blobHas(pathname: string): Promise<boolean> {
     await head(pathname);
     return true;
   } catch (err) {
-    if (
-      err instanceof Error &&
-      /(not\s*found|does\s*not\s*exist)/i.test(err.message)
-    ) {
-      return false;
-    }
-    if (
-      err &&
-      typeof err === "object" &&
-      "name" in err &&
-      typeof (err as { name?: unknown }).name === "string" &&
-      /BlobNotFound/i.test((err as { name: string }).name)
-    ) {
-      return false;
-    }
+    if (isBlobNotFound(err)) return false;
     throw err;
   }
 }
 
+async function blobDeleteIfPresent(pathname: string): Promise<void> {
+  try {
+    await del(pathname);
+  } catch (err) {
+    if (isBlobNotFound(err)) return;
+    // Cleanup is best-effort; surface as a warning rather than throwing so
+    // we don't shadow the original write error.
+    console.warn(
+      `[cache] blob cleanup failed for ${pathname}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
 
 // ─── Filesystem backend ───────────────────────────────────────────────────────
 
@@ -178,10 +183,29 @@ async function fsHas(p: string): Promise<boolean> {
   }
 }
 
+async function fsDeleteIfPresent(p: string): Promise<void> {
+  try {
+    await fs.unlink(p);
+  } catch (err) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      (err as { code?: string }).code === "ENOENT"
+    ) {
+      return;
+    }
+    console.warn(
+      `[cache] fs cleanup failed for ${p}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function getPersona(slug: string): Promise<CachedPersona | null> {
-  if (useBlob()) {
+  if (shouldUseBlob()) {
     const [md, examplesJson, metaJson] = await Promise.all([
       blobReadText(blobKey(slug, "md")),
       blobReadText(blobKey(slug, "examples")),
@@ -208,6 +232,18 @@ export async function getPersona(slug: string): Promise<CachedPersona | null> {
   };
 }
 
+/**
+ * Transactional persona write.
+ *
+ * Order:
+ *   1. md + examples in parallel.
+ *   2. meta.json (the commit marker) only after step 1 succeeds.
+ *
+ * If step 1 fails, we delete whichever sibling did succeed before throwing —
+ * so a slug never persists in a "partial" state where md+examples exist but
+ * meta does not (which would be invisible to readers anyway, but accumulates
+ * billable orphan blobs over time).
+ */
 export async function setPersona(persona: Persona): Promise<void> {
   const slug = persona.meta.slug;
   const md = renderPersonaMd(persona);
@@ -215,33 +251,78 @@ export async function setPersona(persona: Persona): Promise<void> {
   const examplesJson = JSON.stringify(examples, null, 2);
   const metaJson = JSON.stringify(persona.meta, null, 2);
 
-  if (useBlob()) {
-    await Promise.all([
-      blobWriteText(blobKey(slug, "md"), md, "text/markdown; charset=utf-8"),
-      blobWriteText(
-        blobKey(slug, "examples"),
-        examplesJson,
-        "application/json; charset=utf-8",
-      ),
-      blobWriteText(
+  if (shouldUseBlob()) {
+    // Step 1: bodies first.
+    try {
+      await Promise.all([
+        blobWriteText(
+          blobKey(slug, "md"),
+          md,
+          "text/markdown; charset=utf-8",
+        ),
+        blobWriteText(
+          blobKey(slug, "examples"),
+          examplesJson,
+          "application/json; charset=utf-8",
+        ),
+      ]);
+    } catch (err) {
+      await Promise.all([
+        blobDeleteIfPresent(blobKey(slug, "md")),
+        blobDeleteIfPresent(blobKey(slug, "examples")),
+      ]);
+      throw err;
+    }
+
+    // Step 2: commit marker. If this fails, roll back the bodies so a
+    // subsequent rebuild starts from a clean slate.
+    try {
+      await blobWriteText(
         blobKey(slug, "meta"),
         metaJson,
         "application/json; charset=utf-8",
-      ),
-    ]);
+      );
+    } catch (err) {
+      await Promise.all([
+        blobDeleteIfPresent(blobKey(slug, "md")),
+        blobDeleteIfPresent(blobKey(slug, "examples")),
+      ]);
+      throw err;
+    }
     return;
   }
 
+  // Filesystem backend mirrors the same transactional contract.
   await ensureFsDir();
-  await Promise.all([
-    fsWriteText(fsPath(slug, "md"), md),
-    fsWriteText(fsPath(slug, "examples"), examplesJson),
-    fsWriteText(fsPath(slug, "meta"), metaJson),
-  ]);
+  try {
+    await Promise.all([
+      fsWriteText(fsPath(slug, "md"), md),
+      fsWriteText(fsPath(slug, "examples"), examplesJson),
+    ]);
+  } catch (err) {
+    await Promise.all([
+      fsDeleteIfPresent(fsPath(slug, "md")),
+      fsDeleteIfPresent(fsPath(slug, "examples")),
+    ]);
+    throw err;
+  }
+
+  try {
+    await fsWriteText(fsPath(slug, "meta"), metaJson);
+  } catch (err) {
+    await Promise.all([
+      fsDeleteIfPresent(fsPath(slug, "md")),
+      fsDeleteIfPresent(fsPath(slug, "examples")),
+    ]);
+    throw err;
+  }
 }
 
 export async function hasPersona(slug: string): Promise<boolean> {
-  if (useBlob()) {
+  // We check all three artefacts (not just meta) because a partial-state
+  // recovery may have left siblings behind. The cleanup pass in setPersona
+  // is best-effort; cross-check at read time stays cheap.
+  if (shouldUseBlob()) {
     const [a, b, c] = await Promise.all([
       blobHas(blobKey(slug, "md")),
       blobHas(blobKey(slug, "examples")),
@@ -257,4 +338,3 @@ export async function hasPersona(slug: string): Promise<boolean> {
   ]);
   return a && b && c;
 }
-

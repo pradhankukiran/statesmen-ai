@@ -78,11 +78,24 @@ export function chatModel(): string {
 export function isFallbackableError(err: unknown): boolean {
   if (err === null || typeof err !== "object") return false;
 
-  const e = err as { statusCode?: unknown; message?: unknown; name?: unknown };
+  const e = err as {
+    statusCode?: unknown;
+    message?: unknown;
+    name?: unknown;
+    cause?: unknown;
+  };
+
+  // Aborts are NOT fallbackable: they signal the caller asked us to stop
+  // (Vercel function timeout, client disconnect, route shutdown). Walking the
+  // fallback list after an abort wastes the rest of the timeout budget on
+  // calls that will themselves abort.
+  if (typeof e.name === "string" && e.name === "AbortError") return false;
+  if (typeof e.name === "string" && e.name === "TimeoutError") return false;
 
   if (typeof e.statusCode === "number") {
     if (e.statusCode === 402) return true; // out of credits — try cheaper/free model
     if (e.statusCode === 408) return true; // request timeout
+    if (e.statusCode === 413) return true; // payload too large — try a larger-context model
     if (e.statusCode === 429) return true; // rate limited
     if (e.statusCode >= 500 && e.statusCode < 600) return true; // backend
   }
@@ -98,6 +111,13 @@ export function isFallbackableError(err: unknown): boolean {
     if (message.includes("upstream")) return true;
     if (message.includes("no endpoints found")) return true;
     if (message.includes("fewer max_tokens")) return true;
+    // Bare undici-level connection errors don't carry a statusCode and
+    // surface as `TypeError: fetch failed`. Worth trying the next provider.
+    if (message.includes("fetch failed")) return true;
+    if (message.includes("econnreset")) return true;
+    if (message.includes("etimedout")) return true;
+    if (message.includes("enotfound")) return true;
+    if (message.includes("socket hang up")) return true;
     // The AI SDK throws "No object generated: could not parse the response."
     // when a model returns structured output that fails Zod validation
     // (truncated JSON, mixed-in reasoning text, etc.). Different models
@@ -116,6 +136,12 @@ export function isFallbackableError(err: unknown): boolean {
       // Upstream connection-level failure (DNS, reset, etc.) — worth retrying.
       return true;
     }
+  }
+
+  // Unwrap `cause` chains: undici/fetch errors often nest the real reason
+  // (ECONNRESET, AbortError, etc.) one level deep.
+  if (e.cause && typeof e.cause === "object") {
+    return isFallbackableError(e.cause);
   }
 
   return false;

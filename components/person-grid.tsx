@@ -20,13 +20,13 @@ export function PersonGrid({
   return (
     <section className="w-full">
       {(heading || meta) && (
-        <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
+        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
           {heading && (
-            <h2 className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">
+            <h2 className="font-heading text-lg font-semibold tracking-tight sm:text-xl">
               {heading}
             </h2>
           )}
-          {meta && <div className="text-sm text-muted-foreground">{meta}</div>}
+          {meta && <div className="text-xs text-muted-foreground">{meta}</div>}
         </div>
       )}
 

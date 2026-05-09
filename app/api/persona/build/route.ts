@@ -7,11 +7,12 @@ import {
 } from "@/lib/persona";
 
 export const runtime = "nodejs";
-// Free-tier OpenRouter models can take 60–120s per LLM call; with 5-model
-// fallback × extract + merge stages, the cold-build pipeline can legitimately
-// run 5+ minutes. Vercel Hobby (Fluid Compute) max is 800s; pick a generous
-// cap that won't truncate a real build.
-export const maxDuration = 300;
+// Free-tier OpenRouter models can take 60–120s per LLM call. With the new
+// per-call 60s timeout × 5-model fallback × extract (+ optional merge)
+// stages, the worst-case cold build is ~5 min. Vercel Hobby (Fluid Compute)
+// max is 800s; 600s gives the pipeline its full fallback budget plus margin
+// for fetch + render + cache writes.
+export const maxDuration = 600;
 
 // ─── Request schema ───────────────────────────────────────────────────────────
 
@@ -44,7 +45,8 @@ type SseEvent =
   | BuildEvent
   | { type: "ready"; cached: true }
   | { type: "ready"; cached: false; meta: PersonaMeta }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "ping" };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -144,6 +146,42 @@ function parseRequest(body: BuildRequestBody): ParsedRequest | string {
   };
 }
 
+// ─── In-process slug-keyed lock ───────────────────────────────────────────────
+//
+// Two concurrent builds for the same slug on a warm function instance would
+// otherwise each spend the full LLM budget and race on the cache write. The
+// lock serialises them so the second call short-circuits on cache hit after
+// the first commits. (Best-effort: doesn't span instances; for full
+// cross-instance dedup, use Vercel KV with setIfNotExists. Out of scope.)
+
+const buildLocks = new Map<string, Promise<void>>();
+
+async function withSlugLock<T>(
+  slug: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const existing = buildLocks.get(slug);
+  if (existing) {
+    // Wait for the in-flight build to finish (success or failure) before
+    // we proceed; ignore its failure since we'll re-check the cache.
+    await existing.catch(() => undefined);
+  }
+  let release!: () => void;
+  const lock = new Promise<void>((res) => {
+    release = res;
+  });
+  buildLocks.set(slug, lock);
+  try {
+    return await fn();
+  } finally {
+    release();
+    // Only delete if our lock is still the registered one (defensive).
+    if (buildLocks.get(slug) === lock) {
+      buildLocks.delete(slug);
+    }
+  }
+}
+
 // ─── SSE plumbing ─────────────────────────────────────────────────────────────
 
 function encodeEvent(encoder: TextEncoder, event: SseEvent): Uint8Array {
@@ -187,48 +225,96 @@ export async function POST(request: Request): Promise<Response> {
   const { slug, name, fetch: fetchConfig } = parsed;
 
   const encoder = new TextEncoder();
+  // Capture the request's abort signal so it can be threaded into every
+  // downstream LLM call and cancel in-flight work when the client
+  // disconnects or Vercel kills the function near maxDuration.
+  const requestSignal = request.signal;
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let closed = false;
+      let pingTimer: ReturnType<typeof setInterval> | null = null;
+
       const send = (event: SseEvent): void => {
+        if (closed) return;
         try {
           controller.enqueue(encodeEvent(encoder, event));
         } catch {
           // Controller closed (client disconnected); swallow.
+          closed = true;
         }
       };
 
       const fail = (err: unknown): void => {
-        const message =
-          err instanceof Error ? err.message : "Unknown build error.";
+        const isAbort =
+          err instanceof Error &&
+          (err.name === "AbortError" || err.name === "TimeoutError");
+        const message = isAbort
+          ? "Build was cancelled or timed out before completing. Try again."
+          : err instanceof Error
+            ? err.message
+            : "Unknown build error.";
+        if (!isAbort) {
+          console.error(
+            `[build] persona build failed for slug=${slug}:`,
+            err instanceof Error ? err.stack ?? err.message : err,
+          );
+        }
         send({ type: "error", message });
       };
 
-      try {
-        if (await hasPersona(slug)) {
-          // Cheap cache hit — surface immediately and skip the pipeline.
-          send({ type: "ready", cached: true });
-          return;
+      // Heartbeat: SSE has no built-in keep-alive; some intermediaries (CDN,
+      // proxies) cut idle streams after ~30-60s. A periodic `ping` event also
+      // lets the client distinguish "still working" from "stream went silent
+      // because the function got killed". Cheap; client ignores `ping`.
+      pingTimer = setInterval(() => {
+        send({ type: "ping" });
+      }, 15_000);
+
+      // If the request itself aborts (client disconnect / Vercel timeout),
+      // close the stream promptly.
+      requestSignal.addEventListener("abort", () => {
+        closed = true;
+        if (pingTimer) clearInterval(pingTimer);
+        try {
+          controller.close();
+        } catch {
+          // Already closed.
         }
+      });
 
-        const persona = await buildPersona({
-          slug,
-          name,
-          fetch: fetchConfig,
-          onProgress: (event) => send(event),
+      try {
+        await withSlugLock(slug, async () => {
+          if (await hasPersona(slug)) {
+            // Cheap cache hit — surface immediately and skip the pipeline.
+            // (Either pre-existing or just produced by a sibling build that
+            // we waited on inside withSlugLock.)
+            send({ type: "ready", cached: true });
+            return;
+          }
+
+          const persona = await buildPersona({
+            slug,
+            name,
+            fetch: fetchConfig,
+            onProgress: (event) => send(event),
+            signal: requestSignal,
+          });
+
+          await setPersona(persona);
+
+          // Re-read meta from the freshly written persona to ensure callers
+          // receive the same shape `status` would return.
+          const cached = await getPersona(slug);
+          const meta: PersonaMeta = cached?.meta ?? persona.meta;
+
+          send({ type: "ready", cached: false, meta });
         });
-
-        await setPersona(persona);
-
-        // Re-read meta from the freshly written persona to ensure callers
-        // receive the same shape `status` would return.
-        const cached = await getPersona(slug);
-        const meta: PersonaMeta = cached?.meta ?? persona.meta;
-
-        send({ type: "ready", cached: false, meta });
       } catch (err) {
         fail(err);
       } finally {
+        if (pingTimer) clearInterval(pingTimer);
+        closed = true;
         try {
           controller.close();
         } catch {
