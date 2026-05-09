@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { BuildProgress, type BuildAttribution } from "@/components/build-progress";
+import { Button } from "@/components/ui/button";
+import { Hero } from "@/components/hero";
 import { getMember } from "@/lib/members";
 import { getPopularPMBySlug } from "@/lib/popular";
 
@@ -68,8 +70,10 @@ export default async function BuildPage({
       name = slug;
     }
     return (
-      <div className="mx-auto w-full max-w-3xl px-6 py-16 sm:py-24">
-        <BuildProgress slug={slug} name={name} memberId={memberId} />
+      <div className="lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
+        <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+          <BuildProgress slug={slug} name={name} memberId={memberId} />
+        </div>
       </div>
     );
   }
@@ -84,32 +88,27 @@ export default async function BuildPage({
       searchTerms: pm.attribution.searchTerms,
     };
     return (
-      <div className="mx-auto w-full max-w-3xl px-6 py-16 sm:py-24">
-        <BuildProgress slug={slug} name={pm.name} attribution={attribution} />
+      <div className="lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
+        <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+          <BuildProgress slug={slug} name={pm.name} attribution={attribution} />
+        </div>
       </div>
     );
   }
 
   // ─── Fallback: neither path applies ───────────────────────────────────────
   return (
-    <div className="mx-auto w-full max-w-3xl px-6 py-16 sm:py-24">
-      <div className="flex flex-col items-start">
-        <span className="mb-8 inline-block bg-brand px-3 py-1 text-xs font-semibold uppercase tracking-widest text-brand-foreground">
-          Malformed URL
-        </span>
-        <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl">
-          This build URL is malformed.
-        </h1>
-        <p className="mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg">
-          The build URL we received doesn&apos;t map to a known persona. Head
-          back to the homepage and pick a Prime Minister to start from.
-        </p>
-        <Link
-          href="/"
-          className="mt-10 inline-flex items-center gap-3 rounded-md border-2 border-foreground bg-brand px-6 py-3 text-base font-semibold text-brand-foreground transition-colors hover:bg-brand/85 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+    <div className="lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
+      <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+        <Hero
+          eyebrow="Malformed URL"
+          headline="This build URL is malformed."
+          body="The build URL we received doesn't map to a known persona. Head back to the homepage and pick a Prime Minister to start from."
         >
-          Return to homepage
-        </Link>
+          <Button variant="primary" size="lg" render={<Link href="/" />}>
+            Return to homepage
+          </Button>
+        </Hero>
       </div>
     </div>
   );

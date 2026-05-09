@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Hero } from "@/components/hero";
 import { cn } from "@/lib/utils";
 
 // ─── SSE event shape (mirrors lib/persona.ts BuildEvent + route additions) ────
@@ -18,7 +20,8 @@ type SseEvent =
   | { type: "merge_done" }
   | { type: "render_done" }
   | { type: "ready"; cached?: boolean }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "ping" };
 
 // ─── UI state ─────────────────────────────────────────────────────────────────
 
@@ -38,13 +41,15 @@ type Step = {
 // Rotating hints shown under the active extract step so the page doesn't
 // look frozen during the slow free-tier LLM call (60-90s per chunk).
 const EXTRACT_HINTS = [
-  "Five free-tier models are racing to finish first…",
+  "The primary model is analysing the speeches…",
   "Extracting vocabulary and pet phrases…",
   "Identifying rhetorical devices…",
-  "Pulling verbatim quotes from the chunk…",
+  "Pulling verbatim quotes from the corpus…",
   "Analysing tone and sentence patterns…",
-  "Free-tier models take ~60–90s per chunk — this is normal.",
+  "Free-tier models take ~60–90s per call — this is normal.",
+  "If the primary model fails, fallbacks take over automatically.",
   "Tagging recurring topics and themes…",
+  "Each model gets up to 60 seconds — if the primary stalls, we move on automatically.",
   "Hold tight — the model is still thinking.",
 ];
 
@@ -96,6 +101,11 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
   // user always has a moving counter even during long LLM waits.
   const [elapsedMs, setElapsedMs] = useState<number>(0);
   const [hintIndex, setHintIndex] = useState<number>(0);
+  // Timestamp of the last received SSE event (any type, including pings).
+  // Used by the stale-stream watchdog to detect silent stream death (function
+  // killed, network drop, infrastructure timeout) since SSE has no built-in
+  // way for the client to know "the server stopped sending us anything".
+  const [lastEventAt, setLastEventAt] = useState<number>(0);
 
   // Guard so a re-mount (e.g. fast refresh, browser-back-then-forward) doesn't
   // automatically re-fire the build. The user must click "Try again" to retry.
@@ -104,7 +114,15 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
   // Run-token: incremented on every retry so an old in-flight stream can't
   // mutate state for the next run.
   const runIdRef = useRef(0);
-  const startTimeRef = useRef<number>(0);
+  // Mirror of the `phase` state for use inside the SSE loop. The loop closes
+  // over the initial render's `phase`, so reading `phase` directly inside
+  // post-loop code would always see the stale value at the time `startBuild`
+  // was created. The ref dodges that.
+  const phaseRef = useRef<Phase>("idle");
+  // Build-start as state (not a ref) because the active step's duration is
+  // derived from it during render: `elapsedMs - (step.startedAt - buildStartedAt)`.
+  // Using a ref would violate react-hooks/refs (no ref reads during render).
+  const [buildStartedAt, setBuildStartedAt] = useState<number>(0);
 
   // Replace the trailing pending step (if any) and add a new one. Settles the
   // previously-active step with its wall-clock duration so the user sees how
@@ -117,7 +135,6 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
           ? { ...s, pending: false, durationMs: now - s.startedAt }
           : s,
       );
-      // If a step with the same id already exists, update its text in place.
       const existing = settled.findIndex((s) => s.id === id);
       if (existing !== -1) {
         settled[existing] = {
@@ -125,7 +142,6 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
           id,
           text,
           pending: true,
-          // Preserve original startedAt — same step, just relabelled.
           startedAt: settled[existing].startedAt,
           durationMs: undefined,
         };
@@ -148,6 +164,9 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
 
   const handleEvent = useCallback(
     (event: SseEvent) => {
+      // Stamp every event (including pings) so the stale-stream watchdog can
+      // distinguish "server still alive" from "stream went silent".
+      setLastEventAt(Date.now());
       switch (event.type) {
         case "fetch_start":
           advance("fetch", "Fetching speeches…");
@@ -186,7 +205,6 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
           advance("merge", "Merged.");
           break;
         case "render_done":
-          // No user-visible message; the imminent "ready" event handles it.
           break;
         case "ready":
           advance("ready", "Done. Opening chat…");
@@ -198,6 +216,12 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
           finalizeAll();
           setErrorMessage(event.message || "Build failed.");
           setPhase("error");
+          break;
+        case "ping":
+          // Heartbeat from the server — no UI state change required. The
+          // timestamp bump above is the entire purpose: it tells the stale-
+          // stream watchdog that the server is still alive even when no
+          // pipeline progress events are being emitted.
           break;
       }
     },
@@ -215,12 +239,12 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
     setSteps([]);
     setExtractProgress(null);
     setElapsedMs(0);
-    startTimeRef.current = Date.now();
+    setBuildStartedAt(Date.now());
+    // Seed the watchdog with "now" so the 45s stale-stream timer counts from
+    // the moment we kicked off the request, not from epoch 0.
+    setLastEventAt(Date.now());
 
     try {
-      // Build the request body. The `/api/persona/build` route accepts either
-      // a `memberId` (modern PM) or an `attribution` config (historical PM)
-      // — exactly one — and validates that contract server-side.
       const body =
         attribution !== undefined
           ? { slug, name, attribution }
@@ -258,6 +282,11 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      // Track whether the server sent us a terminal event (`ready` or
+      // `error`) before the stream closed. If `done: true` arrives without
+      // one, the function likely crashed or hit a Vercel infrastructure
+      // timeout — surface that to the user rather than freeze forever.
+      let receivedTerminal = false;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -266,14 +295,11 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // SSE frames are separated by a blank line.
         let sepIndex: number;
         while ((sepIndex = buffer.indexOf("\n\n")) !== -1) {
           const frame = buffer.slice(0, sepIndex);
           buffer = buffer.slice(sepIndex + 2);
 
-          // A frame may have multiple `data:` lines (or other fields). We only
-          // care about `data:`; concatenate them per the SSE spec.
           const dataLines: string[] = [];
           for (const line of frame.split("\n")) {
             if (line.startsWith("data:")) {
@@ -288,11 +314,29 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
           try {
             parsed = JSON.parse(payload) as SseEvent;
           } catch {
-            // Skip malformed frames rather than killing the whole stream.
             continue;
+          }
+          if (parsed.type === "ready" || parsed.type === "error") {
+            receivedTerminal = true;
           }
           handleEvent(parsed);
         }
+      }
+
+      // Stream ended (`done: true`) without a terminal event. Check our run
+      // is still current and the UI thinks we're still running before
+      // surfacing this as an error — otherwise we'd clobber a phase=done
+      // transition the `ready` handler already made.
+      if (
+        runId === runIdRef.current &&
+        !receivedTerminal &&
+        phaseRef.current === "running"
+      ) {
+        finalizeAll();
+        setErrorMessage(
+          "Build stream ended unexpectedly. The server may have crashed or timed out. Please try again.",
+        );
+        setPhase("error");
       }
     } catch (err) {
       if (runId !== runIdRef.current) return;
@@ -302,35 +346,52 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
       setErrorMessage(message);
       setPhase("error");
     }
-  }, [handleEvent, memberId, attribution, name, slug]);
+  }, [handleEvent, finalizeAll, memberId, attribution, name, slug]);
 
-  // Auto-start once on first mount only. Browser back/forward should NOT
-  // re-fire the pipeline.
-  //
-  // No cleanup abort here on purpose: React 19 StrictMode in dev runs effects
-  // mount → cleanup → mount, which would abort the just-dispatched POST before
-  // it leaves the browser. The runIdRef + startedRef guards already prevent
-  // stale state updates and double-fires; an in-flight fetch on real unmount
-  // is allowed to complete (the server-side stream closes naturally when the
-  // client drops the connection).
+  // Keep phaseRef in sync so the SSE loop (which closes over the initial
+  // render's value) can read the current phase after the stream ends.
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  // Auto-start once on first mount only. No cleanup abort: React 19
+  // StrictMode runs effects mount → cleanup → mount, which would abort the
+  // just-dispatched POST before it leaves the browser. The runIdRef + startedRef
+  // guards already prevent stale state updates and double-fires.
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     void startBuild();
   }, [startBuild]);
 
-  // Elapsed-time ticker. Ticks every second while the build is running so the
-  // counter visibly moves even during the slow extraction phase.
   useEffect(() => {
-    if (phase !== "running") return;
+    if (phase !== "running" || buildStartedAt === 0) return;
     const id = setInterval(() => {
-      setElapsedMs(Date.now() - startTimeRef.current);
+      setElapsedMs(Date.now() - buildStartedAt);
     }, 1000);
     return () => clearInterval(id);
-  }, [phase]);
+  }, [phase, buildStartedAt]);
 
-  // Rotate the extract sub-hint while an extract step is pending so the page
-  // doesn't feel frozen during the long LLM call.
+  // Stale-stream watchdog. SSE has no client-side way to detect the server
+  // dying mid-stream (function killed, network drop, infrastructure timeout)
+  // — the reader just sits in `await reader.read()` forever. The server now
+  // pings every 15s, so 45s without *any* event (including pings) means the
+  // stream is genuinely dead. Trip the UI into the error state so the user
+  // can retry instead of staring at a frozen spinner.
+  useEffect(() => {
+    if (phase !== "running" || lastEventAt === 0) return;
+    const id = setInterval(() => {
+      if (Date.now() - lastEventAt > 45_000) {
+        finalizeAll();
+        setErrorMessage(
+          "Lost connection to the build stream. The server may have timed out. Please try again.",
+        );
+        setPhase("error");
+      }
+    }, 5_000);
+    return () => clearInterval(id);
+  }, [phase, lastEventAt, finalizeAll]);
+
   const isExtracting = steps.some(
     (s) => s.pending && s.id === "extract",
   );
@@ -347,27 +408,17 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
   }, [startBuild]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
-  //
-  // Brutalist-with-brand-yellow language to match the landing/profile/chat
-  // pages: yellow accent pill at top, oversized confident headline, a small
-  // uppercase tracking-widest accent line for status (cold build · elapsed),
-  // then a bordered step panel and a brutalist progress bar. No card chrome,
-  // no soft corners.
 
   return (
-    <div className="flex flex-col items-start">
-      {/* ─ Hero band: pill + headline + status accent + supporting copy ──── */}
-      <header className="flex w-full flex-col items-start">
-        <span className="mb-8 inline-block bg-brand px-3 py-1 text-xs font-semibold uppercase tracking-widest text-brand-foreground">
-          Building persona
-        </span>
-
-        <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl">
-          Building {name}…
-        </h1>
-
+    <div className="flex flex-col items-start lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
+      <div className="flex w-full flex-col items-start lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+        <Hero
+        eyebrow="Building persona"
+        headline={<>Building {name}…</>}
+        body="This only happens once. Future visitors get instant chat. The primary model analyses the speeches; if it fails, fallbacks take over automatically. Typical builds finish in 30–120 seconds."
+      >
         {phase === "running" || phase === "done" ? (
-          <div className="mt-4 flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="flex items-center gap-3 text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             <span>Cold build</span>
             <span aria-hidden className="text-foreground/30">
               ·
@@ -384,22 +435,22 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
               <span className="font-mono tabular-nums text-foreground">
                 {formatDuration(elapsedMs)}
               </span>
+              {elapsedMs > 540_000 ? (
+                // 9 min in. Server maxDuration is 600s (10 min), so we're
+                // close to the hard ceiling — keep the warning subtle.
+                <span className="text-muted-foreground/80">
+                  · approaching server timeout
+                </span>
+              ) : null}
             </span>
           </div>
         ) : null}
+      </Hero>
 
-        <p className="mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg">
-          This only happens once. Future visitors get instant chat. Five
-          language models race to analyse the speeches in parallel — the
-          fastest valid result wins.
-        </p>
-      </header>
-
-      {/* ─ Step panel: bordered rectangle, sharp corners. Each row gets real
-         breathing room and a clear icon / label / duration split. */}
-      <ol className="mt-10 flex w-full flex-col divide-y-2 divide-border rounded-md border-2 border-foreground bg-background">
+      {/* Step panel — soft Card-style chrome. */}
+      <ol className="mt-10 flex w-full flex-col divide-y divide-border overflow-hidden rounded-xl bg-card ring-1 ring-border">
         {steps.length === 0 && phase === "running" ? (
-          <li className="flex items-center gap-3 px-5 py-4 text-base">
+          <li className="flex items-center gap-3 px-5 py-4 text-sm">
             <Loader2 className="size-4 shrink-0 animate-spin text-brand" aria-hidden />
             <span className="text-muted-foreground">Starting…</span>
           </li>
@@ -410,7 +461,7 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
             className="flex flex-col gap-1.5 px-5 py-4"
             aria-current={step.pending ? "step" : undefined}
           >
-            <div className="flex items-start gap-3 text-base">
+            <div className="flex items-start gap-3 text-sm">
               {step.pending ? (
                 <Loader2
                   className="mt-[3px] size-4 shrink-0 animate-spin text-brand"
@@ -418,7 +469,7 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
                 />
               ) : (
                 <CheckCircle2
-                  className="mt-[3px] size-4 shrink-0 text-brand"
+                  className="mt-[3px] size-4 shrink-0 text-foreground/70"
                   aria-hidden
                 />
               )}
@@ -426,25 +477,30 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
                 className={cn(
                   "min-w-0 flex-1 leading-snug",
                   step.pending
-                    ? "font-semibold text-foreground"
+                    ? "font-medium text-foreground"
                     : "text-muted-foreground",
                 )}
               >
                 {step.text}
               </span>
               {step.durationMs !== undefined ? (
-                <span className="shrink-0 font-mono text-xs uppercase tracking-widest tabular-nums text-muted-foreground">
+                <span className="shrink-0 font-mono text-[0.6875rem] tabular-nums text-muted-foreground">
                   {formatStepDuration(step.durationMs)}
                 </span>
               ) : step.pending ? (
-                <span className="shrink-0 font-mono text-xs uppercase tracking-widest tabular-nums text-muted-foreground">
-                  {formatStepDuration(elapsedMs - (step.startedAt - startTimeRef.current))}
+                // Derived from state only — no Date.now() during render.
+                // (build-start-elapsed) - (build-start-to-step-start) =
+                // step-start-elapsed.
+                <span className="shrink-0 font-mono text-[0.6875rem] tabular-nums text-muted-foreground">
+                  {formatStepDuration(
+                    Math.max(0, elapsedMs - (step.startedAt - buildStartedAt)),
+                  )}
                 </span>
               ) : null}
             </div>
             {step.pending && step.id === "extract" ? (
               <p
-                className="ml-7 text-sm text-muted-foreground"
+                className="ml-7 text-xs text-muted-foreground"
                 aria-live="polite"
               >
                 {EXTRACT_HINTS[hintIndex % EXTRACT_HINTS.length]}
@@ -454,12 +510,10 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
         ))}
       </ol>
 
-      {/* ─ Brutalist progress bar: bordered rectangle, brand-yellow fill,
-         tracking-widest accent label. Sits below the step panel as the
-         primary "how far are we" affordance. */}
+      {/* Progress bar — soft track, brand-yellow fill. */}
       {extractProgress && extractProgress.total > 0 ? (
         <div className="mt-8 flex w-full flex-col gap-3">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <div className="flex items-center justify-between text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             <span>Chunks analysed</span>
             <span className="font-mono tabular-nums text-foreground">
               {Math.min(extractProgress.done, extractProgress.total)} /{" "}
@@ -467,7 +521,7 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
             </span>
           </div>
           <div
-            className="h-3 w-full overflow-hidden rounded-md border-2 border-foreground bg-background"
+            className="h-2 w-full overflow-hidden rounded-full bg-muted"
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={extractProgress.total}
@@ -477,7 +531,7 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
             )}
           >
             <div
-              className="h-full bg-brand transition-[width] duration-300"
+              className="h-full rounded-full bg-brand transition-[width] duration-300"
               style={{
                 width: `${
                   (Math.min(extractProgress.done, extractProgress.total) /
@@ -490,40 +544,32 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
         </div>
       ) : null}
 
-      {/* ─ Error state: bordered destructive panel + brutalist primary retry
-         button matching the chat-cta pattern. */}
+      {/* Error state. */}
       {phase === "error" ? (
-        <div className="mt-10 flex w-full flex-col gap-5 rounded-md border-2 border-destructive bg-destructive/5 p-5 sm:p-6">
+        <div className="mt-10 flex w-full flex-col gap-5 rounded-xl bg-destructive/5 p-5 ring-1 ring-inset ring-destructive/20 sm:p-6">
           <div className="flex items-start gap-3">
             <TriangleAlert
               className="mt-[3px] size-5 shrink-0 text-destructive"
               aria-hidden
             />
             <div className="flex flex-col gap-1.5">
-              <p className="text-xs font-semibold uppercase tracking-widest text-destructive">
+              <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-destructive">
                 Build failed
               </p>
-              <p className="text-base text-foreground">
+              <p className="text-sm text-foreground sm:text-base">
                 {errorMessage ?? "Unknown error."}
               </p>
             </div>
           </div>
           <div>
-            <button
-              type="button"
-              onClick={handleRetry}
-              className={cn(
-                "inline-flex items-center gap-3 rounded-md border-2 border-foreground bg-brand px-6 py-3 text-base font-semibold text-brand-foreground",
-                "cursor-pointer transition-colors hover:bg-brand/85 active:translate-y-px",
-                "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand",
-              )}
-            >
-              <RefreshCw className="size-5" aria-hidden />
+            <Button variant="primary" size="lg" onClick={handleRetry}>
+              <RefreshCw aria-hidden />
               Try again
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}
+      </div>
     </div>
   );
 }
