@@ -7,12 +7,11 @@ import {
 } from "@/lib/persona";
 
 export const runtime = "nodejs";
-// Free-tier OpenRouter models can take 60–120s per LLM call. With the new
+// Vercel Hobby plan caps Serverless Function maxDuration at 300s. With the
 // per-call 60s timeout × 5-model fallback × extract (+ optional merge)
-// stages, the worst-case cold build is ~5 min. Vercel Hobby (Fluid Compute)
-// max is 800s; 600s gives the pipeline its full fallback budget plus margin
-// for fetch + render + cache writes.
-export const maxDuration = 600;
+// stages, builds that need many fallback hops may run up against this; in
+// practice the typical cold build finishes well inside 300s.
+export const maxDuration = 300;
 
 // ─── Request schema ───────────────────────────────────────────────────────────
 
