@@ -170,9 +170,9 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
   const canRetry = error !== undefined && messages.length > 0;
 
   return (
-    <div className="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-3xl flex-col px-4 sm:px-6">
+    <div className="mx-auto flex min-h-[calc(100svh-4rem)] w-full max-w-3xl flex-col px-4 sm:px-6 lg:h-full lg:min-h-0 lg:overflow-hidden">
       {/* Persona header */}
-      <header className="flex items-center gap-4 border-b border-border py-6 sm:py-8">
+      <header className="flex items-center gap-4 border-b border-border py-6 sm:py-8 lg:flex-shrink-0">
         <Avatar name={name} src={photoUrl} size="lg" loading="eager" />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h1 className="truncate text-xl font-semibold leading-tight tracking-tight sm:text-2xl">
@@ -184,7 +184,8 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
         </div>
       </header>
 
-      {/* Conversation */}
+      {/* Conversation — at lg+ this is the only scrollable region. */}
+      <div className="flex flex-1 flex-col lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
       {hasMessages ? (
         <ol className="flex flex-col gap-8 py-10 sm:py-12">
           {messages.map((message) => {
@@ -275,12 +276,16 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
           disabled={isBusy}
         />
       )}
+      </div>
 
-      {/* Composer */}
+      {/* Composer — sticky on mobile (page scrolls); pinned by flex at lg+
+          (the parent is overflow-hidden so sticky is a no-op there, but kept
+          so the `before:` fade gradient still has a positioned ancestor). */}
       <div
         className={cn(
           "sticky bottom-0 z-10 -mx-4 mt-auto bg-background pb-4 pt-3 sm:-mx-6 sm:pb-6",
           "before:pointer-events-none before:absolute before:-top-8 before:left-0 before:right-0 before:h-8 before:bg-gradient-to-b before:from-transparent before:to-background",
+          "lg:mt-0 lg:flex-shrink-0",
         )}
       >
         <form
