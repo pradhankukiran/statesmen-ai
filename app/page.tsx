@@ -1,23 +1,14 @@
-import { PersonGrid, type PersonGridItem } from "@/components/person-grid";
 import { Hero } from "@/components/hero";
+import { PersonCard } from "@/components/person-card";
 import { getPopularPMs, popularPhotoUrl } from "@/lib/popular";
 
-const popularItems: PersonGridItem[] = getPopularPMs().map((pm) => ({
-  // memberId entries route as /p/<id>; attribution entries route as /p/<slug>.
-  id: pm.kind === "memberId" ? pm.id : pm.slug,
-  name: pm.name,
-  party: pm.party,
-  partyColor: pm.partyColor,
-  house: pm.house,
-  term: pm.term,
-  tagline: pm.tagline,
-  photoUrl: popularPhotoUrl(pm),
-}));
-
 export default function Home() {
+  const popular = getPopularPMs();
+
   return (
-    <div className="mx-auto w-full max-w-6xl lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
-      <div className="px-6 pt-10 sm:pt-14 lg:pt-6 lg:flex-shrink-0">
+    <div className="lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
+      {/* Hero — aligned to the page column. */}
+      <div className="mx-auto w-full max-w-6xl px-6 pt-10 sm:pt-14 lg:pt-6 lg:flex-shrink-0">
         <Hero
           size="lg"
           eyebrow="Hansard-grounded · UK politicians"
@@ -33,16 +24,40 @@ export default function Home() {
         />
       </div>
 
-      <section className="mt-10 px-6 pb-10 sm:mt-12 sm:pb-14 lg:mt-6 lg:pb-6 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
-        <PersonGrid
-          heading="Popular Prime Ministers"
-          meta={
+      {/* Popular row — heading aligns to the page column, but the card
+          scroller bleeds past max-w-6xl so the row visibly overflows the
+          gutter on wide screens (intentional "there's more here" cue). */}
+      <section className="mt-10 sm:mt-12 lg:mt-6 lg:flex-1 lg:min-h-0 lg:overflow-y-hidden">
+        <div className="mx-auto mb-5 flex w-full max-w-6xl flex-wrap items-baseline justify-between gap-3 px-6">
+          <h2 className="font-heading text-lg font-semibold tracking-tight sm:text-xl">
+            Popular Prime Ministers
+          </h2>
+          <div className="text-xs text-muted-foreground">
             <span className="font-medium uppercase tracking-[0.16em]">
-              Start here
+              Start here · Scroll for more →
             </span>
-          }
-          items={popularItems}
-        />
+          </div>
+        </div>
+
+        <ul className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin]">
+          {popular.map((pm) => (
+            <li
+              key={pm.slug}
+              className="w-48 shrink-0 snap-start sm:w-52 md:w-56 lg:w-60"
+            >
+              <PersonCard
+                id={pm.kind === "memberId" ? pm.id : pm.slug}
+                name={pm.name}
+                party={pm.party}
+                partyColor={pm.partyColor}
+                house={pm.house}
+                term={pm.term}
+                tagline={pm.tagline}
+                photoUrl={popularPhotoUrl(pm)}
+              />
+            </li>
+          ))}
+        </ul>
       </section>
     </div>
   );

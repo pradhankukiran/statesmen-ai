@@ -55,56 +55,25 @@
     "photoUrl": "https://members-api.parliament.uk/api/Members/1467/Thumbnail"
   },
   {
-    "slug": "margaret-thatcher",
-    "name": "Margaret Thatcher",
-    "party": "Conservative",
-    "partyColor": "#0063ba",
+    "slug": "gordon-brown",
+    "id": 591,
+    "name": "Gordon Brown",
+    "party": "Labour",
+    "partyColor": "#dc241f",
     "house": "Commons",
-    "term": "1979–1990",
-    "tagline": "The Iron Lady",
-    "photoMemberId": 953,
-    "attribution": {
-      "label": "The Prime Minister",
-      "startDate": "1979-05-04",
-      "endDate": "1990-11-28",
-      "searchTerms": [
-        "falklands",
-        "miners",
-        "european",
-        "soviet",
-        "unions",
-        "privatisation",
-        "defence",
-        "ira",
-        "inflation",
-        "thatcher"
-      ]
-    }
+    "term": "2007–2010",
+    "tagline": "Crisis-era PM",
+    "photoUrl": "https://members-api.parliament.uk/api/Members/591/Thumbnail"
   },
   {
-    "slug": "winston-churchill",
-    "name": "Sir Winston Churchill",
-    "party": "Conservative",
-    "partyColor": "#0063ba",
+    "slug": "tony-blair",
+    "id": 512,
+    "name": "Tony Blair",
+    "party": "Labour",
+    "partyColor": "#dc241f",
     "house": "Commons",
-    "term": "1940–1945, 1951–1955",
-    "tagline": "Wartime PM",
-    "attribution": {
-      "label": "The Prime Minister",
-      "startDate": "1940-05-10",
-      "endDate": "1955-04-05",
-      "searchTerms": [
-        "war",
-        "germany",
-        "victory",
-        "europe",
-        "soviet",
-        "empire",
-        "defence",
-        "freedom",
-        "iron curtain",
-        "churchill"
-      ]
-    }
+    "term": "1997–2007",
+    "tagline": "New Labour PM",
+    "photoUrl": "https://members-api.parliament.uk/api/Members/512/Thumbnail"
   }
 ]
