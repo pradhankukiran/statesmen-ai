@@ -109,7 +109,7 @@ export function PersonCard({
             </div>
           )}
         </div>
-        <CardContent className="flex flex-col gap-1.5 bg-brand py-3 text-brand-foreground transition-colors group-hover:bg-brand-hover">
+        <CardContent className="flex flex-1 flex-col gap-1.5 bg-brand py-3 text-brand-foreground transition-colors group-hover:bg-brand-hover">
           <div className="font-heading text-[0.9375rem] leading-snug font-medium">
             {name}
           </div>
