@@ -15,8 +15,8 @@ export default function ProfileLoading() {
   const id = params?.id;
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:py-14">
-      <header className="flex flex-col items-start">
+    <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:py-14 lg:flex lg:h-full lg:flex-col lg:overflow-hidden lg:py-0 lg:pt-10">
+      <header className="flex flex-col items-start lg:flex-shrink-0">
         {/* Eyebrow placeholder mirrors the resting brand pill. */}
         <span
           aria-hidden
@@ -26,33 +26,35 @@ export default function ProfileLoading() {
         <Skeleton className="mt-4 h-3 w-56 rounded-md" />
       </header>
 
-      <section className="mt-12 grid gap-10 sm:mt-16 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:gap-12">
-        <div className="max-w-sm">
-          {id ? (
-            <ViewTransition name={`portrait-${id}`}>
+      <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pb-10">
+        <section className="mt-12 grid gap-10 sm:mt-16 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:gap-12">
+          <div className="max-w-sm">
+            {id ? (
+              <ViewTransition name={`portrait-${id}`}>
+                <Skeleton className="aspect-[3/4] w-full rounded-2xl" />
+              </ViewTransition>
+            ) : (
               <Skeleton className="aspect-[3/4] w-full rounded-2xl" />
-            </ViewTransition>
-          ) : (
-            <Skeleton className="aspect-[3/4] w-full rounded-2xl" />
-          )}
-        </div>
-
-        <div className="flex flex-col gap-8">
-          <div className="flex flex-col gap-3">
-            <Skeleton className="h-5 w-full max-w-xl rounded-md" />
-            <Skeleton className="h-5 w-11/12 max-w-xl rounded-md" />
-            <Skeleton className="h-5 w-3/4 max-w-xl rounded-md" />
+            )}
           </div>
 
-          {/* CTA placeholder — matches the new primary button height (lg = 48px). */}
-          <span
-            aria-hidden
-            className="inline-block h-12 w-56 rounded-md bg-brand"
-          />
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-3">
+              <Skeleton className="h-5 w-full max-w-xl rounded-md" />
+              <Skeleton className="h-5 w-11/12 max-w-xl rounded-md" />
+              <Skeleton className="h-5 w-3/4 max-w-xl rounded-md" />
+            </div>
 
-          <Skeleton className="h-3 w-72 rounded-md" />
-        </div>
-      </section>
+            {/* CTA placeholder — matches the new primary button height (lg = 48px). */}
+            <span
+              aria-hidden
+              className="inline-block h-12 w-56 rounded-md bg-brand"
+            />
+
+            <Skeleton className="h-3 w-72 rounded-md" />
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
