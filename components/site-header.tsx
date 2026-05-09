@@ -1,30 +1,34 @@
 import Link from "next/link";
 import { Landmark } from "lucide-react";
 
-// ─ Top-of-page chrome: brand mark on the left, persona tagline on the right.
-//   Tagline collapses to a short pill on mobile so the header stays balanced.
+import { HeaderSearch } from "@/components/header-search";
+
+// Top-of-page chrome: brand mark on the left, search in the middle, persona
+// tagline on the right (tagline collapses on narrow screens to keep search
+// from getting squeezed).
 export function SiteHeader() {
   return (
-    <header className="border-b">
-      <div className="mx-auto flex h-20 w-full max-w-6xl items-center justify-between px-6">
+    <header className="border-b border-border">
+      <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-4 px-6 sm:gap-6">
         <Link
           href="/"
           aria-label="Statesmen AI — home"
-          className="group flex items-center gap-3 rounded-sm font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand"
+          className="group flex shrink-0 items-center gap-2.5 rounded-md font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <span className="flex size-10 items-center justify-center rounded-md bg-brand text-brand-foreground transition group-hover:brightness-95">
-            <Landmark className="size-6" aria-hidden />
+          <span className="flex size-8 items-center justify-center rounded-md bg-brand text-brand-foreground transition-colors group-hover:bg-brand-hover">
+            <Landmark className="size-[1.125rem]" aria-hidden />
           </span>
-          <span className="text-lg transition-colors group-hover:text-foreground/80">
+          <span className="hidden text-base transition-colors group-hover:text-foreground/80 sm:inline">
             Statesmen AI
           </span>
         </Link>
-        <nav className="text-xs uppercase tracking-widest text-muted-foreground">
-          {/* ─ Long form on >=sm, short pill on mobile so the header still balances. */}
-          <span className="hidden sm:block">
-            Hansard-grounded · AI personas
-          </span>
-          <span className="sm:hidden">AI personas</span>
+        <div className="min-w-0 flex-1">
+          <div className="mx-auto w-full max-w-md">
+            <HeaderSearch />
+          </div>
+        </div>
+        <nav className="hidden text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-muted-foreground lg:block">
+          Hansard-grounded · AI personas
         </nav>
       </div>
     </header>

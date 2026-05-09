@@ -1,5 +1,4 @@
 import { PersonGrid, type PersonGridItem } from "@/components/person-grid";
-import { SearchBar } from "@/components/search-bar";
 import { Hero } from "@/components/hero";
 import { getPopularPMs, popularPhotoUrl } from "@/lib/popular";
 
@@ -29,22 +28,20 @@ export default function Home() {
               of British politics.
             </>
           }
-          body="Pick a Prime Minister, MP, or Lord — past or present — and have a conversation with an AI persona built from their real recorded speeches."
+          body="Pick a Prime Minister, MP, or Lord — past or present — and have a conversation with an AI persona built from their real recorded speeches. Search any politician from the bar in the header."
         />
       </div>
 
       <section className="mt-10 px-6 pb-10 sm:mt-12 sm:pb-14 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
-        <SearchBar>
-          <PersonGrid
-            heading="Popular Prime Ministers"
-            meta={
-              <span className="font-medium uppercase tracking-[0.16em]">
-                Start here
-              </span>
-            }
-            items={popularItems}
-          />
-        </SearchBar>
+        <PersonGrid
+          heading="Popular Prime Ministers"
+          meta={
+            <span className="font-medium uppercase tracking-[0.16em]">
+              Start here
+            </span>
+          }
+          items={popularItems}
+        />
       </section>
     </div>
   );
