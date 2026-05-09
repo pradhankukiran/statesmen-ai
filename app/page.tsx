@@ -24,51 +24,44 @@ export default function Home() {
         />
       </div>
 
-      {/* Popular row — heading aligns to the page column, but the card
-          scroller bleeds past max-w-6xl so the row visibly overflows the
-          gutter on wide screens (intentional "there's more here" cue). */}
+      {/* Popular row — wrapped in max-w-6xl + px-6 so the entire section
+          (heading + scrolling cards) sits inside the page column and is
+          centered horizontally. The row scrolls within the column when
+          cards overflow; the column's own gutters provide the breathing
+          room from the viewport edges. */}
       <section className="mt-10 sm:mt-12 lg:mt-6 lg:flex-1 lg:min-h-0 lg:overflow-y-hidden">
-        <div className="mx-auto mb-5 flex w-full max-w-6xl flex-wrap items-baseline justify-between gap-3 px-6">
-          <h2 className="font-heading text-lg font-semibold tracking-tight sm:text-xl">
-            Popular Prime Ministers
-          </h2>
-          <div className="text-xs text-muted-foreground">
-            <span className="font-medium uppercase tracking-[0.16em]">
-              Start here · Scroll for more →
-            </span>
+        <div className="mx-auto w-full max-w-6xl px-6">
+          <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className="font-heading text-lg font-semibold tracking-tight sm:text-xl">
+              Popular Prime Ministers
+            </h2>
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium uppercase tracking-[0.16em]">
+                Start here · Scroll for more →
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/*
-          Plain horizontal scroller — no snap. Real DOM spacer <li>
-          elements at both ends guarantee the 16px gutters (browser
-          counts them in scrollWidth regardless of flex+overflow-x-auto
-          quirks). Inter-card spacing comes from `mr-4` on every card
-          except the last.
-        */}
-        <ul className="flex overflow-x-auto pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin]">
-          <li role="presentation" aria-hidden="true" className="w-4 shrink-0" />
-          {popular.map((pm, i) => (
-            <li
-              key={pm.slug}
-              className={`w-45 shrink-0${
-                i < popular.length - 1 ? " mr-4" : ""
-              }`}
-            >
-              <PersonCard
-                id={pm.kind === "memberId" ? pm.id : pm.slug}
-                name={pm.name}
-                party={pm.party}
-                partyColor={pm.partyColor}
-                house={pm.house}
-                term={pm.term}
-                tagline={pm.tagline}
-                photoUrl={popularPhotoUrl(pm)}
-              />
-            </li>
-          ))}
-          <li role="presentation" aria-hidden="true" className="w-4 shrink-0" />
-        </ul>
+          <ul className="flex gap-4 overflow-x-auto pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin]">
+            {popular.map((pm) => (
+              <li
+                key={pm.slug}
+                className="w-44 shrink-0 sm:w-48 md:w-52 lg:w-56"
+              >
+                <PersonCard
+                  id={pm.kind === "memberId" ? pm.id : pm.slug}
+                  name={pm.name}
+                  party={pm.party}
+                  partyColor={pm.partyColor}
+                  house={pm.house}
+                  term={pm.term}
+                  tagline={pm.tagline}
+                  photoUrl={popularPhotoUrl(pm)}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
     </div>
   );
