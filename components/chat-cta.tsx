@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useActionState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, MessageSquare } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-
-type StatusResponse =
-  | { status: "ready" }
-  | { status: "missing" }
-  | { error: string };
+import { Button } from "@/components/ui/button";
+import {
+  checkPersonaStatusAction,
+  type PersonaStatusResult,
+} from "@/lib/actions";
 
 type Props = {
   /** Persona cache key (also the URL segment for /chat and /build). */
@@ -30,115 +29,127 @@ type Props = {
   hasAttribution: boolean;
 };
 
-// ─── ChatCta ──────────────────────────────────────────────────────────────────
-//
-// The page's anchor action. Hand-rolled brutalist primary button — flat brand
-// yellow, heavy black border, sharp corners, big confident type. Sits at the
-// same visual weight as the chat composer's send-state and the landing-page
-// "highlight" pill.
-//
-// Loading copy stays as "Checking…" but renders in the same big type as the
-// resting state so the button doesn't shrink/wobble between states.
+/** The state machine that backs the action. */
+type CtaState =
+  | { kind: "idle" }
+  | { kind: "result"; result: PersonaStatusResult }
+  | { kind: "error"; message: string };
+
+const INITIAL_STATE: CtaState = { kind: "idle" };
 
 export function ChatCta({ slug, name, memberId, hasAttribution }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [isChecking, setIsChecking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Separate transition for the post-success router.push. `useActionState`'s
+  // `isPending` covers the action itself; this covers the navigation that
+  // follows so the button stays in its loading skin until the new route
+  // commits.
+  const [isNavigating, startNavigation] = useTransition();
 
-  const isBusy = isChecking || isPending;
   const canBuild = memberId !== null || hasAttribution;
 
-  async function handleClick() {
-    setError(null);
-    if (!canBuild) {
-      setError("This figure has no Members API id or attribution config.");
+  // The action: a thin client adapter over the server action. The reducer
+  // signature is `(prevState, payload | undefined) => nextState`. We don't
+  // need a payload — the slug is captured from props — so it's typed `void`.
+  const [state, runCheck, isPending] = useActionState<CtaState, void>(
+    async () => {
+      if (!canBuild) {
+        return {
+          kind: "error",
+          message: "This figure has no Members API id or attribution config.",
+        };
+      }
+      try {
+        const result = await checkPersonaStatusAction(slug);
+        return { kind: "result", result };
+      } catch (err) {
+        // Server actions usually surface errors via the returned value, but
+        // network-level failures (route shutdown, etc.) can still throw.
+        const message =
+          err instanceof Error ? err.message : "Could not check persona status.";
+        return { kind: "error", message };
+      }
+    },
+    INITIAL_STATE,
+  );
+
+  // Routing is a side-effect, so it lives in a useEffect watching the action
+  // state — not inside the action reducer (which must be a pure function of
+  // its prev state + payload). The transition keeps `isBusy` true across the
+  // navigation handoff.
+  useEffect(() => {
+    if (state.kind !== "result") return;
+    const result = state.result;
+    if (result.status === "ready") {
+      startNavigation(() => {
+        router.push(`/chat/${slug}`);
+      });
       return;
     }
-    setIsChecking(true);
-    try {
-      const res = await fetch(
-        `/api/persona/status?slug=${encodeURIComponent(slug)}`,
-        { cache: "no-store" },
-      );
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as Partial<StatusResponse>;
-        throw new Error(
-          ("error" in body && body.error) ||
-            `Status check failed (${res.status})`,
-        );
-      }
-
-      const data = (await res.json()) as StatusResponse;
-
-      if ("status" in data && data.status === "ready") {
-        startTransition(() => {
-          router.push(`/chat/${slug}`);
-        });
-        return;
-      }
-
-      if ("status" in data && data.status === "missing") {
-        // Modern PMs append `?id=<memberId>` so the build page renders
-        // memberId-mode immediately. Historical PMs route plain — the build
-        // page resolves attribution from popular-pms.json on the server.
-        const target =
-          memberId !== null ? `/build/${slug}?id=${memberId}` : `/build/${slug}`;
-        startTransition(() => {
-          router.push(target);
-        });
-        return;
-      }
-
-      throw new Error("Unexpected response from status endpoint.");
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Could not check persona status.";
-      setError(message);
-    } finally {
-      setIsChecking(false);
+    if (result.status === "missing") {
+      // Modern PMs append `?id=<memberId>` so the build page renders
+      // memberId-mode immediately. Historical PMs route plain — the build
+      // page resolves attribution from popular-pms.json on the server.
+      const target =
+        memberId !== null ? `/build/${slug}?id=${memberId}` : `/build/${slug}`;
+      startNavigation(() => {
+        router.push(target);
+      });
     }
-  }
+  }, [state, slug, memberId, router]);
+
+  const isBusy = isPending || isNavigating;
+  const errorMessage =
+    state.kind === "error"
+      ? state.message
+      : state.kind === "result" && state.result.status === "error"
+        ? state.result.message
+        : null;
+  // After an error the user should be able to retry — the button text shifts
+  // from "Chat with X" to "Try again" so the affordance is clear.
+  const hasRetry = !isBusy && errorMessage !== null;
 
   return (
     <div className="flex flex-col items-start gap-3">
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={isBusy || !canBuild}
-        aria-busy={isBusy || undefined}
-        className={cn(
-          // Brutalist primary: flat brand-yellow fill, heavy black border,
-          // sharp rounded-md corners, oversized confident type.
-          "inline-flex items-center gap-3 rounded-md border-2 border-foreground bg-brand px-6 py-3 text-base font-semibold text-brand-foreground sm:px-8 sm:py-4 sm:text-lg",
-          // Tactile press: yellow darkens slightly on hover, button drops
-          // 1px on click. No shadow, no soft transition — just edges.
-          "cursor-pointer transition-colors hover:bg-brand/85 active:translate-y-px",
-          // Brand yellow stays in the focus ring so the affordance reads
-          // even on darker backgrounds.
-          "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand",
-          "disabled:cursor-not-allowed disabled:opacity-60",
-        )}
+      {/* The action runs on click via formAction-style submit. Wrapping the
+          button in a tiny form is the canonical way to trigger a React
+          action without a payload — keeps the JSX shape close to a normal
+          submit button. */}
+      <form
+        action={() => {
+          runCheck();
+        }}
       >
-        {isBusy ? (
-          <>
-            <Loader2 className="size-5 animate-spin" aria-hidden />
-            Checking…
-          </>
-        ) : (
-          <>
-            <MessageSquare className="size-5" aria-hidden />
-            Chat with {name}
-          </>
-        )}
-      </button>
-      {error ? (
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          disabled={isBusy || !canBuild}
+          aria-busy={isBusy || undefined}
+        >
+          {isBusy ? (
+            <>
+              <Loader2 className="animate-spin" aria-hidden />
+              Checking…
+            </>
+          ) : hasRetry ? (
+            <>
+              <MessageSquare aria-hidden />
+              Try again
+            </>
+          ) : (
+            <>
+              <MessageSquare aria-hidden />
+              Chat with {name}
+            </>
+          )}
+        </Button>
+      </form>
+      {errorMessage ? (
         <p
           role="alert"
-          className="rounded-md border-2 border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+          className="rounded-md bg-destructive/5 px-3 py-2 text-xs text-destructive ring-1 ring-inset ring-destructive/20"
         >
-          {error}
+          {errorMessage}
         </p>
       ) : null}
     </div>
