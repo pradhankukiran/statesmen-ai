@@ -43,7 +43,7 @@ export default function Home() {
           {popular.map((pm) => (
             <li
               key={pm.slug}
-              className="w-48 shrink-0 snap-start sm:w-52 md:w-56 lg:w-60"
+              className="w-48 shrink-0 snap-start last:mr-4 sm:w-52 md:w-56 lg:w-60"
             >
               <PersonCard
                 id={pm.kind === "memberId" ? pm.id : pm.slug}
