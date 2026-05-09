@@ -79,7 +79,7 @@ export function PersonCard({
       href={`/p/${id}`}
       aria-label={`Open profile for ${name}`}
       className={cn(
-        "group block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "group block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         className,
       )}
     >
