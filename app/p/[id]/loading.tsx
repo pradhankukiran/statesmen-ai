@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { ViewTransition } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -27,10 +28,13 @@ export default function ProfileLoading() {
 
       <section className="mt-12 grid gap-10 sm:mt-16 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:gap-12">
         <div className="max-w-sm">
-          <Skeleton
-            className="aspect-[3/4] w-full rounded-2xl"
-            style={id ? { viewTransitionName: `portrait-${id}` } : undefined}
-          />
+          {id ? (
+            <ViewTransition name={`portrait-${id}`}>
+              <Skeleton className="aspect-[3/4] w-full rounded-2xl" />
+            </ViewTransition>
+          ) : (
+            <Skeleton className="aspect-[3/4] w-full rounded-2xl" />
+          )}
         </div>
 
         <div className="flex flex-col gap-8">

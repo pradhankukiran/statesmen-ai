@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ViewTransition } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { getMemberPhotoUrl } from "@/lib/members";
@@ -88,19 +89,20 @@ export function PersonCard({
       >
         <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
           {src ? (
-            <Image
-              src={src}
-              alt={`Portrait of ${name}`}
-              fill
-              sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, (min-width: 640px) 33vw, 50vw"
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-              // Shared-element name: the profile page sets the same name on
-              // its portrait so the browser morphs the image across the
-              // navigation. `id` here is either a numeric Members API id or
-              // a popular-pms slug — both safe in a CSS ident behind the
-              // `portrait-` prefix (slugs are kebab-cased ASCII).
-              style={{ viewTransitionName: `portrait-${id}` }}
-            />
+            // Shared-element morph: the profile page (and its loading skeleton)
+            // wrap their portrait in <ViewTransition name="portrait-<id>">
+            // with the same id, so React coordinates a morph across the
+            // navigation. `id` is either a numeric Members API id or a
+            // popular-pms slug — both safe in a CSS ident.
+            <ViewTransition name={`portrait-${id}`}>
+              <Image
+                src={src}
+                alt={`Portrait of ${name}`}
+                fill
+                sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, (min-width: 640px) 33vw, 50vw"
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+              />
+            </ViewTransition>
           ) : (
             <div
               aria-hidden

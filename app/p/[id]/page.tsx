@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { ViewTransition } from "react";
 import type { Metadata } from "next";
 
 import { ChatCta } from "@/components/chat-cta";
@@ -160,24 +161,24 @@ export default async function ProfilePage({
             />
           ) : null}
           {profile.photoUrl ? (
-            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
-              <Image
-                src={profile.photoUrl}
-                alt={`Portrait of ${profile.name}`}
-                fill
-                sizes="(min-width: 768px) 33vw, 100vw"
-                priority
-                className="object-cover"
-                // Shared-element name: must match the value PersonCard sets on
-                // the same portrait. Cards keyed by a numeric Members API id
-                // surface `memberId` here; attribution PMs (Thatcher etc.)
-                // come in via the slug route, where `popular.slug` matches
-                // the URL `id`. Both branches resolve to the card's value.
-                style={{
-                  viewTransitionName: `portrait-${profile.memberId ?? profile.popular?.slug ?? id}`,
-                }}
-              />
-            </div>
+            // Shared-element name must match what PersonCard sets on the same
+            // portrait. Cards keyed by a numeric Members API id surface
+            // `memberId` here; attribution PMs (Thatcher etc.) come in via
+            // the slug route, where `popular.slug` matches the URL `id`.
+            <ViewTransition
+              name={`portrait-${profile.memberId ?? profile.popular?.slug ?? id}`}
+            >
+              <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
+                <Image
+                  src={profile.photoUrl}
+                  alt={`Portrait of ${profile.name}`}
+                  fill
+                  sizes="(min-width: 768px) 33vw, 100vw"
+                  priority
+                  className="object-cover"
+                />
+              </div>
+            </ViewTransition>
           ) : (
             <div
               aria-hidden
