@@ -49,7 +49,7 @@ export default function Home() {
           overflows. `scroll-px-4` keeps snap targets inset by 16px so
           card-to-card snapping preserves the same visual gutter.
         */}
-        <ul className="flex snap-x snap-mandatory overflow-x-auto scroll-px-4 pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin]">
+        <ul className="flex snap-x snap-proximity overflow-x-auto scroll-px-4 pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin]">
           <li role="presentation" aria-hidden="true" className="w-4 shrink-0" />
           {popular.map((pm, i) => (
             <li
