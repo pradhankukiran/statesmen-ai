@@ -83,10 +83,7 @@ export function PersonCard({
         className,
       )}
     >
-      <Card
-        size="sm"
-        className="h-full transition-colors group-hover:bg-muted/50"
-      >
+      <Card size="sm" className="h-full gap-0 py-0">
         <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
           {src ? (
             // Shared-element morph: the profile page (and its loading skeleton)
@@ -112,32 +109,32 @@ export function PersonCard({
             </div>
           )}
         </div>
-        <CardContent className="flex flex-col gap-1.5">
+        <CardContent className="flex flex-col gap-1.5 bg-brand py-3 text-brand-foreground transition-colors group-hover:bg-brand-hover">
           <div className="font-heading text-[0.9375rem] leading-snug font-medium">
             {name}
           </div>
           {(party || subtitle) && (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-foreground/80">
               {party && (
                 <span className="inline-flex items-center gap-1.5">
                   <span
                     aria-hidden
-                    className="inline-block size-2 rounded-full ring-1 ring-inset ring-foreground/15"
+                    className="inline-block size-2 rounded-full ring-1 ring-inset ring-brand-foreground/20"
                     style={{
-                      backgroundColor: partyColor ?? "var(--muted-foreground)",
+                      backgroundColor: partyColor ?? "currentColor",
                     }}
                   />
-                  <span className="text-foreground/80">{party}</span>
+                  <span className="text-brand-foreground">{party}</span>
                 </span>
               )}
               {party && subtitle && (
-                <span aria-hidden className="text-muted-foreground/60">·</span>
+                <span aria-hidden className="text-brand-foreground/40">·</span>
               )}
               {subtitle && <span>{subtitle}</span>}
             </div>
           )}
           {tagline && (
-            <div className="text-xs text-muted-foreground/80">{tagline}</div>
+            <div className="text-xs text-brand-foreground/70">{tagline}</div>
           )}
         </CardContent>
       </Card>
