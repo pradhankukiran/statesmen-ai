@@ -4,6 +4,29 @@
 
 @plugin "@tailwindcss/typography";
 
+/* Opt the document into the View Transitions API for same-document
+   navigations. Next.js (with experimental.viewTransition) drives these
+   under the hood via document.startViewTransition; named transitions on
+   shared elements (e.g. the politician portrait) morph between routes,
+   while the rest of the page cross-fades through the root pseudo-elements
+   tuned below. */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 220ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 /* ───────────────────────────────────────────────────────────────────────────
