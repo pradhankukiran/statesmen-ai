@@ -40,21 +40,18 @@ export default function Home() {
         </div>
 
         {/*
-          Layout: flex row, no `gap`, no padding on the container. Real DOM
-          spacer <li> elements at both ends provide the 16px gutters and are
-          guaranteed to count toward scrollWidth. Inter-card spacing comes
-          from `mr-4` on every card except the last. This avoids the well-
-          known `flex + overflow-x-auto` browser bugs where trailing
-          padding/margin/pseudo-element gutters get eaten when content
-          overflows. `scroll-px-4` keeps snap targets inset by 16px so
-          card-to-card snapping preserves the same visual gutter.
+          Plain horizontal scroller — no snap. Real DOM spacer <li>
+          elements at both ends guarantee the 16px gutters (browser
+          counts them in scrollWidth regardless of flex+overflow-x-auto
+          quirks). Inter-card spacing comes from `mr-4` on every card
+          except the last.
         */}
-        <ul className="flex snap-x snap-proximity overflow-x-auto scroll-px-4 pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin]">
+        <ul className="flex overflow-x-auto pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin]">
           <li role="presentation" aria-hidden="true" className="w-4 shrink-0" />
           {popular.map((pm, i) => (
             <li
               key={pm.slug}
-              className={`w-48 shrink-0 snap-start sm:w-52 md:w-56 lg:w-60${
+              className={`w-48 shrink-0 sm:w-52 md:w-56 lg:w-60${
                 i < popular.length - 1 ? " mr-4" : ""
               }`}
             >
