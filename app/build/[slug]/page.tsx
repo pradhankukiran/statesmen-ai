@@ -104,6 +104,7 @@ export default async function BuildPage({
           eyebrow="Malformed URL"
           headline="This build URL is malformed."
           body="The build URL we received doesn't map to a known persona. Head back to the homepage and pick a Prime Minister to start from."
+          bodyMaxWidth="max-w-none"
         >
           <Button variant="primary" size="lg" render={<Link href="/" />}>
             Return to homepage

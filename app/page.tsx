@@ -17,7 +17,7 @@ const popularItems: PersonGridItem[] = getPopularPMs().map((pm) => ({
 export default function Home() {
   return (
     <div className="mx-auto w-full max-w-6xl lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
-      <div className="px-6 pt-10 sm:pt-14 lg:flex-shrink-0">
+      <div className="px-6 pt-10 sm:pt-14 lg:pt-6 lg:flex-shrink-0">
         <Hero
           size="lg"
           eyebrow="Hansard-grounded · UK politicians"
@@ -29,10 +29,11 @@ export default function Home() {
             </>
           }
           body="Pick a Prime Minister, MP, or Lord — past or present — and have a conversation with an AI persona built from their real recorded speeches. Search any politician from the bar in the header."
+          bodyMaxWidth="max-w-none"
         />
       </div>
 
-      <section className="mt-10 px-6 pb-10 sm:mt-12 sm:pb-14 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+      <section className="mt-10 px-6 pb-10 sm:mt-12 sm:pb-14 lg:mt-6 lg:pb-6 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
         <PersonGrid
           heading="Popular Prime Ministers"
           meta={

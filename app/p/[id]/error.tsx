@@ -23,6 +23,7 @@ export default function ProfileError({ error, reset }: Props) {
         eyebrow="Profile error"
         headline="Couldn't load that profile."
         body="The Members API didn't respond as expected. This is usually transient — try again, or pick someone else from the homepage."
+        bodyMaxWidth="max-w-none"
       >
         {error.digest ? (
           <p className="-mt-2 mb-6 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-muted-foreground/80">

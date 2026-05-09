@@ -416,6 +416,7 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
         eyebrow="Building persona"
         headline={<>Building {name}…</>}
         body="This only happens once. Future visitors get instant chat. The primary model analyses the speeches; if it fails, fallbacks take over automatically. Typical builds finish in 30–120 seconds."
+        bodyMaxWidth="max-w-none"
       >
         {phase === "running" || phase === "done" ? (
           <div className="flex items-center gap-3 text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">

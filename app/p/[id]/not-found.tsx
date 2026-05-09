@@ -17,6 +17,7 @@ export default function ProfileNotFound() {
         eyebrow="404 · Not found"
         headline="We couldn't find that politician."
         body="The Members API has no record matching that profile ID. They may have been removed, or the link is malformed."
+        bodyMaxWidth="max-w-none"
       >
         <Button variant="primary" size="lg" render={<Link href="/" />}>
           Browse politicians
