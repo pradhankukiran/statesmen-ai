@@ -40,19 +40,23 @@ export default function Home() {
         </div>
 
         {/*
-          Pseudo-element spacers (`before:` / `after:`) provide the leading
-          and trailing 16px gutters. They render as flex children so the
-          browser ALWAYS includes them in scrollWidth — unlike padding-right
-          on a flex+overflow-x-auto container, which several browsers eat
-          when content overflows. Result: identical 16px gap on both ends
-          regardless of scroll position. `scroll-px-4` keeps snap targets
-          inset by the same amount so card-to-card snapping holds the gutter.
+          Layout: flex row, no `gap`, no padding on the container. Real DOM
+          spacer <li> elements at both ends provide the 16px gutters and are
+          guaranteed to count toward scrollWidth. Inter-card spacing comes
+          from `mr-4` on every card except the last. This avoids the well-
+          known `flex + overflow-x-auto` browser bugs where trailing
+          padding/margin/pseudo-element gutters get eaten when content
+          overflows. `scroll-px-4` keeps snap targets inset by 16px so
+          card-to-card snapping preserves the same visual gutter.
         */}
-        <ul className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-4 pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin] before:block before:w-4 before:shrink-0 before:content-[''] after:block after:w-4 after:shrink-0 after:content-['']">
-          {popular.map((pm) => (
+        <ul className="flex snap-x snap-mandatory overflow-x-auto scroll-px-4 pb-10 sm:pb-14 lg:pb-6 [scrollbar-width:thin]">
+          <li role="presentation" aria-hidden="true" className="w-4 shrink-0" />
+          {popular.map((pm, i) => (
             <li
               key={pm.slug}
-              className="w-48 shrink-0 snap-start sm:w-52 md:w-56 lg:w-60"
+              className={`w-48 shrink-0 snap-start sm:w-52 md:w-56 lg:w-60${
+                i < popular.length - 1 ? " mr-4" : ""
+              }`}
             >
               <PersonCard
                 id={pm.kind === "memberId" ? pm.id : pm.slug}
@@ -66,6 +70,7 @@ export default function Home() {
               />
             </li>
           ))}
+          <li role="presentation" aria-hidden="true" className="w-4 shrink-0" />
         </ul>
       </section>
     </div>
