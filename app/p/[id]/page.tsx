@@ -1,7 +1,9 @@
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { ChatCta } from "@/components/chat-cta";
+import { Hero } from "@/components/hero";
 import { getMember, getMemberPhotoUrl, type Member } from "@/lib/members";
 import { getPopularPMBySlug, type PopularPM } from "@/lib/popular";
 import { slugify } from "@/lib/slug";
@@ -29,14 +31,14 @@ function formatTerm(member: Member): string | null {
   return `${start}–${end}`;
 }
 
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return `${first}${last}`.toUpperCase();
+}
+
 // ─── Profile data ─────────────────────────────────────────────────────────────
-//
-// Both the Members API path (modern) and the popular-pms-registry path
-// (historical) feed into this slim shape so the page renders uniformly.
-//
-// `slug` is the persona key fed to ChatCta — for modern entries it's
-// derived via `slugify(name)` upstream; for historical entries it's the
-// authored slug from popular-pms.json.
 
 type ProfileData = {
   slug: string;
@@ -47,14 +49,11 @@ type ProfileData = {
   house: string;
   term: string | null;
   photoUrl: string | null;
-  /** Numeric Members API id when this profile maps to one. */
   memberId: number | null;
-  /** Source-of-truth registry entry for historical figures. */
   popular: PopularPM | null;
 };
 
 async function loadProfile(rawId: string): Promise<ProfileData> {
-  // Path 1: numeric id → Members API.
   const numericId = parsePositiveInt(rawId);
   if (numericId !== null) {
     let member: Member;
@@ -77,8 +76,6 @@ async function loadProfile(rawId: string): Promise<ProfileData> {
     };
   }
 
-  // Path 2: non-numeric → popular-pms registry by slug. This is how
-  // historical figures (Thatcher, Churchill) reach the profile page.
   const pm = getPopularPMBySlug(rawId);
   if (pm === undefined) notFound();
 
@@ -121,12 +118,6 @@ export async function generateMetadata({
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-//
-// Same brutalist-with-brand-yellow language as the landing page and the chat
-// page: yellow accent pill at the top, oversized confident headline, then a
-// two-column photo/info layout that breathes. The photo sits in a bare
-// `border-2 border-foreground` rectangle (no card chrome, no soft corners),
-// and the CTA is a hand-rolled brutalist primary button anchoring the page.
 
 export default async function ProfilePage({
   params,
@@ -136,89 +127,62 @@ export default async function ProfilePage({
   const { id } = await params;
   const profile = await loadProfile(id);
 
-  // Build the yellow accent pill: "PARTY · TERM" if both, else whichever we
-  // have, falling back to just the house. Keeps the pill terse and
-  // information-rich, like the landing-page hero badge.
+  // Eyebrow assembly: "PARTY · TERM" if both, else whichever we have.
   const pillBits: string[] = [];
   if (profile.party) pillBits.push(profile.party);
   if (profile.term) pillBits.push(profile.term);
   if (pillBits.length === 0) pillBits.push(profile.house);
-  const pillText = pillBits.join(" · ");
+  const eyebrow = pillBits.join(" · ");
 
-  // Sub-headline: small uppercase-tracked accent line under the name.
-  // House always shows; fullTitle joins with a separator when distinct from
-  // the display name, so peers/MPs read at a glance.
+  // Sub-headline below the name.
   const subBits: string[] = [profile.house];
   if (profile.fullTitle && profile.fullTitle !== profile.name) {
     subBits.push(profile.fullTitle);
   }
 
-  // Initials fallback for photos we can't source (historical figures with
-  // no `photoMemberId`, e.g. Churchill).
-  const photoInitials = (() => {
-    const parts = profile.name.trim().split(/\s+/);
-    const first = parts[0]?.[0] ?? "";
-    const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-    return `${first}${last}`.toUpperCase();
-  })();
-
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-24">
-      {/* ─ Hero band ────────────────────────────────────────────────────────
-         Matches the landing-page rhythm: yellow pill, oversized name, small
-         uppercase accent line. Sits above the photo/info split so the eye
-         lands on the name first. */}
-      <header className="flex flex-col items-start">
-        <span className="mb-8 inline-block bg-brand px-3 py-1 text-xs font-semibold uppercase tracking-widest text-brand-foreground">
-          {pillText}
-        </span>
-
-        <h1 className="text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
-          {profile.name}
-        </h1>
-
-        <p className="mt-4 text-xs uppercase tracking-widest text-muted-foreground">
+    <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:py-14">
+      <Hero size="lg" eyebrow={eyebrow} headline={profile.name}>
+        <p className="-mt-3 text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-muted-foreground">
           {subBits.join(" · ")}
         </p>
-      </header>
+      </Hero>
 
-      {/* ─ Photo + info split ───────────────────────────────────────────────
-         Single column on mobile, two columns from sm+. Photo gets a bare
-         border rectangle — no card, no shadow, no soft corners. Info column
-         flows naturally beside it. */}
+      {/* Photo + info split. Single column on mobile, two columns from sm+. */}
       <section className="mt-12 grid gap-10 sm:mt-16 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:gap-12">
-        {/* Photo — brutalist frame with optional party-colour stripe.
-           Falls back to a brand-yellow initials tile for historical figures
-           with no available portrait. */}
+        {/* Photo — soft Card-style chrome with optional party-colour stripe. */}
         <div className="relative max-w-sm">
           {profile.partyColor ? (
             <span
               aria-hidden
-              className="absolute -left-3 top-0 block h-full w-1.5 sm:-left-4 sm:w-2"
+              className="absolute -left-3 top-0 block h-full w-1 rounded-full sm:-left-4 sm:w-1.5"
               style={{ backgroundColor: profile.partyColor }}
             />
           ) : null}
           {profile.photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={profile.photoUrl}
-              alt={`Portrait of ${profile.name}`}
-              className="aspect-[3/4] w-full rounded-md border-2 border-foreground bg-muted object-cover"
-              loading="eager"
-            />
+            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
+              <Image
+                src={profile.photoUrl}
+                alt={`Portrait of ${profile.name}`}
+                fill
+                sizes="(min-width: 768px) 33vw, 100vw"
+                priority
+                className="object-cover"
+              />
+            </div>
           ) : (
             <div
               aria-hidden
-              className="flex aspect-[3/4] w-full items-center justify-center rounded-md border-2 border-foreground bg-brand text-6xl font-semibold tracking-tight text-brand-foreground sm:text-7xl"
+              className="flex aspect-[3/4] w-full items-center justify-center rounded-2xl bg-brand text-6xl font-semibold tracking-tight text-brand-foreground ring-1 ring-border sm:text-7xl"
             >
-              {photoInitials}
+              {initials(profile.name)}
             </div>
           )}
         </div>
 
-        {/* Info column — bio paragraph + CTA + tiny footnote. */}
+        {/* Info column. */}
         <div className="flex flex-col gap-8">
-          <p className="max-w-xl text-base text-muted-foreground sm:text-lg">
+          <p className="max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
             Profile sourced from the UK Parliament Members API. Click below to
             chat with an AI persona built from {profile.name}&apos;s real
             recorded speeches in Hansard.
@@ -235,7 +199,7 @@ export default async function ProfilePage({
             />
           </div>
 
-          <p className="text-xs uppercase tracking-widest text-muted-foreground">
+          <p className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-muted-foreground">
             AI-generated · Not actual statements by {profile.name}
           </p>
         </div>

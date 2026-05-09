@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -64,12 +65,6 @@ export function PersonCard({
   photoUrl,
   className,
 }: PersonCardProps) {
-  // Photo source resolution:
-  //   - explicit `photoUrl` always wins (set by popular-pms.json or search
-  //     results upstream),
-  //   - else fall back to `getMemberPhotoUrl(id)` only when `id` is numeric,
-  //   - else `null`, which triggers an initials-tile fallback below
-  //     (used by historical entries with no photoMemberId, e.g. Churchill).
   const src =
     photoUrl ?? (typeof id === "number" ? getMemberPhotoUrl(id) : null);
   const derivedTerm = deriveTerm(term, startedAt, endedAt);
@@ -83,23 +78,21 @@ export function PersonCard({
       href={`/p/${id}`}
       aria-label={`Open profile for ${name}`}
       className={cn(
-        "group block rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        "group block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         className,
       )}
     >
       <Card
         size="sm"
-        className="h-full transition-colors group-hover:bg-muted/50 group-focus-visible:bg-muted/50"
+        className="h-full transition-colors group-hover:bg-muted/50"
       >
-        <div className="aspect-[3/4] w-full overflow-hidden bg-muted">
+        <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
           {src ? (
-            // Plain <img> intentional: next/image needs remotePatterns config.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={src}
               alt={`Portrait of ${name}`}
-              loading="lazy"
-              decoding="async"
+              fill
+              sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, (min-width: 640px) 33vw, 50vw"
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
             />
           ) : (
@@ -112,7 +105,7 @@ export function PersonCard({
           )}
         </div>
         <CardContent className="flex flex-col gap-1.5">
-          <div className="font-heading text-base leading-snug font-medium">
+          <div className="font-heading text-[0.9375rem] leading-snug font-medium">
             {name}
           </div>
           {(party || subtitle) && (
@@ -121,7 +114,7 @@ export function PersonCard({
                 <span className="inline-flex items-center gap-1.5">
                   <span
                     aria-hidden
-                    className="inline-block size-2 rounded-full ring-1 ring-foreground/15"
+                    className="inline-block size-2 rounded-full ring-1 ring-inset ring-foreground/15"
                     style={{
                       backgroundColor: partyColor ?? "var(--muted-foreground)",
                     }}
