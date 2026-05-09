@@ -1,51 +1,49 @@
+"use client";
+
+import { useParams } from "next/navigation";
+
 import { Skeleton } from "@/components/ui/skeleton";
 
-// ─── ProfileLoading ───────────────────────────────────────────────────────────
-//
-// Mirrors the profile page layout exactly so there's no surprise reflow when
-// the data lands: hero band (yellow pill placeholder, oversized name line,
-// small accent line), then the two-column photo/info split. Same paddings,
-// same grid template, same border weights.
-
+// Mirrors the profile page layout — same paddings, same grid, same chrome —
+// so there's no surprise reflow when the data lands. The portrait skeleton
+// carries the same `portrait-<id>` view-transition name as the card and the
+// real profile portrait, so the morph survives the Suspense boundary on slow
+// async loaders (modern PMs via the Members API).
 export default function ProfileLoading() {
+  const params = useParams<{ id: string }>();
+  const id = params?.id;
+
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-24">
-      {/* ─ Hero band placeholder ────────────────────────────────────────── */}
+    <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:py-14">
       <header className="flex flex-col items-start">
-        {/* Yellow pill placeholder — same flat box as the resting pill so the
-           accent doesn't pop in. */}
+        {/* Eyebrow placeholder mirrors the resting brand pill. */}
         <span
           aria-hidden
-          className="mb-8 inline-block h-[1.625rem] w-44 bg-brand"
+          className="mb-6 inline-block h-6 w-44 rounded-md bg-brand"
         />
-        {/* Hero-sized name line: matches text-5xl/6xl height. */}
-        <Skeleton className="h-12 w-3/4 rounded-md sm:h-16 sm:w-2/3" />
-        {/* Small uppercase accent line. */}
+        <Skeleton className="h-10 w-3/4 rounded-md sm:h-14 sm:w-2/3" />
         <Skeleton className="mt-4 h-3 w-56 rounded-md" />
       </header>
 
-      {/* ─ Photo + info split ───────────────────────────────────────────── */}
       <section className="mt-12 grid gap-10 sm:mt-16 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:gap-12">
-        {/* Photo frame — 3:4, same border treatment as the real one so the
-           edge weight matches before/after load. */}
         <div className="max-w-sm">
-          <Skeleton className="aspect-[3/4] w-full rounded-md border-2 border-foreground" />
+          <Skeleton
+            className="aspect-[3/4] w-full rounded-2xl"
+            style={id ? { viewTransitionName: `portrait-${id}` } : undefined}
+          />
         </div>
 
-        {/* Info column. */}
         <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-3">
-            <Skeleton className="h-5 w-full max-w-xl rounded-md sm:h-6" />
-            <Skeleton className="h-5 w-11/12 max-w-xl rounded-md sm:h-6" />
-            <Skeleton className="h-5 w-3/4 max-w-xl rounded-md sm:h-6" />
+            <Skeleton className="h-5 w-full max-w-xl rounded-md" />
+            <Skeleton className="h-5 w-11/12 max-w-xl rounded-md" />
+            <Skeleton className="h-5 w-3/4 max-w-xl rounded-md" />
           </div>
 
-          {/* CTA placeholder — same flat brand-yellow as the real button so
-             the focus moment isn't disrupted by a grey bar morphing into a
-             yellow one. */}
+          {/* CTA placeholder — matches the new primary button height (lg = 48px). */}
           <span
             aria-hidden
-            className="inline-block h-[3.125rem] w-64 rounded-md border-2 border-foreground bg-brand sm:h-[3.625rem]"
+            className="inline-block h-12 w-56 rounded-md bg-brand"
           />
 
           <Skeleton className="h-3 w-72 rounded-md" />
