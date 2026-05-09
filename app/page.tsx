@@ -51,7 +51,7 @@ export default function Home() {
           {popular.map((pm, i) => (
             <li
               key={pm.slug}
-              className={`w-48 shrink-0 sm:w-52 md:w-56 lg:w-60${
+              className={`w-40 shrink-0 sm:w-44 md:w-48 lg:w-52${
                 i < popular.length - 1 ? " mr-4" : ""
               }`}
             >
