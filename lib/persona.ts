@@ -46,9 +46,12 @@ import { getMember } from "./members";
 const SINGLE_CALL_THRESHOLD = 80_000;
 
 /**
- * Per-LLM-call timeout. Tuned so that a full 5-model fallback walk fits
- * comfortably inside the route's `maxDuration` (currently 600s) with margin
- * for fetch + render + cache writes.
+ * Per-LLM-call timeout. The route's `maxDuration` is 300s (Vercel Hobby
+ * cap) and the route layer enforces a global ~270s working ceiling (90% of
+ * 300s) propagated as an `AbortSignal` into every LLM call. A single 60s
+ * timeout therefore caps a worst-case fallback walk to ~4 attempts before
+ * the global deadline preempts it — extract + merge stages both share the
+ * same global budget.
  */
 const PER_CALL_TIMEOUT_MS = 60_000;
 

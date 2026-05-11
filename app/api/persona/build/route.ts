@@ -13,6 +13,13 @@ export const runtime = "nodejs";
 // practice the typical cold build finishes well inside 300s.
 export const maxDuration = 300;
 
+// Global build deadline = 90% of `maxDuration` so we keep ~30s of headroom
+// to write a clean SSE error and close the stream before Vercel forcibly
+// kills the function with an opaque 504. The deadline is propagated as an
+// AbortSignal into every LLM call so the fallback walk terminates
+// promptly once the budget is exhausted.
+const BUILD_DEADLINE_MS = Math.floor(maxDuration * 1000 * 0.9);
+
 // ─── Request schema ───────────────────────────────────────────────────────────
 
 type BuildRequestBody = {
@@ -226,8 +233,22 @@ export async function POST(request: Request): Promise<Response> {
   const encoder = new TextEncoder();
   // Capture the request's abort signal so it can be threaded into every
   // downstream LLM call and cancel in-flight work when the client
-  // disconnects or Vercel kills the function near maxDuration.
+  // disconnects.
   const requestSignal = request.signal;
+  // Separate deadline signal: fires at ~90% of maxDuration so we can write
+  // a clean SSE error and close the stream before Vercel forcibly kills
+  // the function. Kept distinct from `requestSignal` so the client-
+  // disconnect path and the deadline path are independently observable.
+  const deadlineSignal = AbortSignal.timeout(BUILD_DEADLINE_MS);
+  // Composite signal threaded into `buildPersona`. Either client
+  // disconnect or deadline-fire aborts every in-flight LLM call via the
+  // extractor/merger's `AbortSignal.any([opts.signal, perCallTimeout])`
+  // composition.
+  const compositeSignal: AbortSignal = AbortSignal.any([
+    requestSignal,
+    deadlineSignal,
+  ]);
+  const requestStartMs = Date.now();
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -248,12 +269,19 @@ export async function POST(request: Request): Promise<Response> {
         const isAbort =
           err instanceof Error &&
           (err.name === "AbortError" || err.name === "TimeoutError");
-        const message = isAbort
-          ? "Build was cancelled or timed out before completing. Try again."
-          : err instanceof Error
-            ? err.message
-            : "Unknown build error.";
-        if (!isAbort) {
+        // Distinguish deadline-fire from generic abort so the user sees a
+        // concrete budget message instead of "cancelled or timed out".
+        const isDeadline = deadlineSignal.aborted && !requestSignal.aborted;
+        const message = isDeadline
+          ? `Build budget exhausted (~${Math.round(
+              BUILD_DEADLINE_MS / 1000,
+            )}s) before completing. Try again.`
+          : isAbort
+            ? "Build was cancelled or timed out before completing. Try again."
+            : err instanceof Error
+              ? err.message
+              : "Unknown build error.";
+        if (!isAbort && !isDeadline) {
           console.error(
             `[build] persona build failed for slug=${slug}:`,
             err instanceof Error ? err.stack ?? err.message : err,
@@ -270,8 +298,9 @@ export async function POST(request: Request): Promise<Response> {
         send({ type: "ping" });
       }, 15_000);
 
-      // If the request itself aborts (client disconnect / Vercel timeout),
-      // close the stream promptly.
+      // If the request itself aborts (client disconnect), close the stream
+      // promptly. Distinct from the deadline path so client-initiated
+      // cancels don't surface as "budget exhausted" errors.
       requestSignal.addEventListener("abort", () => {
         closed = true;
         if (pingTimer) clearInterval(pingTimer);
@@ -280,6 +309,25 @@ export async function POST(request: Request): Promise<Response> {
         } catch {
           // Already closed.
         }
+      });
+
+      // Deadline-fire path. Emits a clean SSE error so the user sees a
+      // concrete budget message before the function exits, rather than an
+      // opaque Vercel 504. We don't close the controller here — the
+      // `finally` block at the bottom of the try-catch handles cleanup
+      // after `buildPersona` rejects via the composite signal.
+      deadlineSignal.addEventListener("abort", () => {
+        console.error(`[persona] deadline reached`, {
+          slug,
+          elapsedMs: Date.now() - requestStartMs,
+          budget: BUILD_DEADLINE_MS,
+        });
+        send({
+          type: "error",
+          message: `Build budget exhausted (~${Math.round(
+            BUILD_DEADLINE_MS / 1000,
+          )}s) before completing. Try again.`,
+        });
       });
 
       try {
@@ -297,7 +345,7 @@ export async function POST(request: Request): Promise<Response> {
             name,
             fetch: fetchConfig,
             onProgress: (event) => send(event),
-            signal: requestSignal,
+            signal: compositeSignal,
           });
 
           await setPersona(persona);
@@ -310,7 +358,11 @@ export async function POST(request: Request): Promise<Response> {
           send({ type: "ready", cached: false, meta });
         });
       } catch (err) {
-        fail(err);
+        // Deadline-fire already emitted its own SSE error via the
+        // listener above; avoid stomping it with a generic abort message.
+        if (!(deadlineSignal.aborted && !requestSignal.aborted)) {
+          fail(err);
+        }
       } finally {
         if (pingTimer) clearInterval(pingTimer);
         closed = true;
