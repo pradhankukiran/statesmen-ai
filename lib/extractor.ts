@@ -200,6 +200,16 @@ async function callOnce<S extends z.ZodTypeAny>(
     // No retries here. The fallback list is the retry mechanism — internal
     // retries waste rate-limit quota on the same already-throttled upstream.
     maxRetries: 0,
+    // Disable hidden reasoning/chain-of-thought tokens. The extraction is a
+    // structured pattern-matching task — reasoning adds latency (10–50K
+    // hidden tokens on models like nvidia/nemotron-*-super) without
+    // measurable quality gain, and pushes calls past the per-call timeout.
+    // No-op on non-reasoning models.
+    providerOptions: {
+      openrouter: {
+        reasoning: { enabled: false },
+      },
+    },
   });
   return object as z.infer<S>;
 }

@@ -110,6 +110,15 @@ async function callOnce(
     // retries just multiply rate-limit pressure on already-throttled
     // upstreams.
     maxRetries: 0,
+    // Disable hidden reasoning/chain-of-thought tokens on the merge call.
+    // Same rationale as the extractor: merging is a structured
+    // deduplication/synthesis task, not multi-step problem solving.
+    // No-op on non-reasoning models.
+    providerOptions: {
+      openrouter: {
+        reasoning: { enabled: false },
+      },
+    },
   });
   return object;
 }
