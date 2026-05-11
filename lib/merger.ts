@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { generateObject } from "ai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createGroq } from "@ai-sdk/groq";
 import { MERGE_SYSTEM, buildMergePrompt } from "./prompts/merge";
 import type { Extraction } from "./extractor";
 import { mergeModels, isFallbackableError, summariseError } from "./models";
@@ -51,7 +51,7 @@ export type MergedPersona = z.infer<typeof MergedPersonaSchema>;
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export type MergeOptions = {
-  /** Override the OpenRouter model id list. Default: lib/models#mergeModels(). */
+  /** Override the Groq model id list. Default: lib/models#mergeModels(). */
   models?: string[];
   temperature?: number;
   /**
@@ -83,9 +83,9 @@ async function callOnce(
   temperature: number,
   signal: AbortSignal,
 ): Promise<MergedPersona> {
-  const openrouter = createOpenRouter({ apiKey });
+  const groq = createGroq({ apiKey });
   const { object } = await generateObject({
-    model: openrouter(modelId),
+    model: groq(modelId),
     schema: MergedPersonaSchema,
     system: MERGE_SYSTEM,
     prompt: buildMergePrompt(name, extractions),
@@ -98,16 +98,6 @@ async function callOnce(
     // retries just multiply rate-limit pressure on already-throttled
     // upstreams.
     maxRetries: 0,
-    // Suppress reasoning/CoT tokens on models that emit them. See extractor.ts
-    // for the per-field rationale (enabled/effort/exclude are all set so at
-    // least one is honoured per provider, and `exclude: true` keeps NVIDIA
-    // Nemotron's unconditional reasoning out of the streamed response).
-    // No-op on non-reasoning models.
-    providerOptions: {
-      openrouter: {
-        reasoning: { enabled: false, effort: "none", exclude: true },
-      },
-    },
   });
   return object;
 }
@@ -122,10 +112,10 @@ export async function mergeExtractions(
   extractions: Extraction[],
   opts: MergeOptions = {},
 ): Promise<{ persona: MergedPersona; model: string }> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "OPENROUTER_API_KEY is not set. Add it to .env.local (see .env.example).",
+      "GROQ_API_KEY is not set. Add it to .env.local (see .env.example).",
     );
   }
   if (extractions.length === 0) {

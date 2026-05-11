@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { generateObject } from "ai";
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { createGroq } from "@ai-sdk/groq";
 import { EXTRACT_SYSTEM, buildExtractPrompt } from "./prompts/extract";
 import { extractModels, isFallbackableError, summariseError } from "./models";
 
@@ -105,7 +105,7 @@ export type FullCorpusPersona = z.infer<typeof FullCorpusPersonaSchema>;
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export type ExtractOptions = {
-  /** Override the OpenRouter model id list. Default: lib/models#extractModels(). */
+  /** Override the Groq model id list. Default: lib/models#extractModels(). */
   models?: string[];
   /** Sampling temperature. Default 0.2 — extraction wants determinism. */
   temperature?: number;
@@ -164,39 +164,22 @@ async function callOnce<S extends z.ZodTypeAny>(
   maxOutputTokens: number,
   signal: AbortSignal,
 ): Promise<z.infer<S>> {
-  const openrouter = createOpenRouter({ apiKey });
+  const groq = createGroq({ apiKey });
   const { object } = await generateObject({
     // The Zod schema's runtime shape and the AI SDK's generic inference
     // don't unify cleanly across `S extends z.ZodTypeAny` callers. Both
     // branches feed identical schema shapes (object schemas with array +
     // string fields), so the runtime contract holds.
-    model: openrouter(modelId),
+    model: groq(modelId),
     schema: schema as z.ZodSchema<z.infer<S>>,
     system: EXTRACT_SYSTEM,
     prompt: buildExtractPrompt(personName, text),
     temperature,
-    // OpenRouter pre-charges for the cap, so leave headroom but don't ask
-    // for the model's full ceiling — that blocks budget-limited accounts.
     maxOutputTokens,
     abortSignal: signal,
     // No retries here. The fallback list is the retry mechanism — internal
     // retries waste rate-limit quota on the same already-throttled upstream.
     maxRetries: 0,
-    // Suppress reasoning/CoT tokens on models that emit them. Combined
-    // signals because no single field is universally honoured:
-    //   • enabled: false   — some providers respect this and skip reasoning
-    //   • effort: "none"   — the documented OpenRouter way to set zero effort
-    //   • exclude: true    — for models that reason regardless (e.g. NVIDIA
-    //                        Nemotron), keep reasoning server-side but
-    //                        omit it from the response so we don't pay
-    //                        latency for streaming/parsing it. Verified
-    //                        on nemotron-nano-9b-v2:free: 2.3s vs 8.3s.
-    // No-op on non-reasoning models.
-    providerOptions: {
-      openrouter: {
-        reasoning: { enabled: false, effort: "none", exclude: true },
-      },
-    },
   });
   return object as z.infer<S>;
 }
@@ -309,10 +292,10 @@ export async function extractStyleFromChunk(
   chunkText: string,
   opts: ExtractOptions = {},
 ): Promise<Extraction> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "OPENROUTER_API_KEY is not set. Add it to .env.local (see .env.example).",
+      "GROQ_API_KEY is not set. Add it to .env.local (see .env.example).",
     );
   }
   const { result } = await runWithFallback(
@@ -338,10 +321,10 @@ export async function extractFullCorpusPersona(
   text: string,
   opts: ExtractOptions = {},
 ): Promise<{ persona: FullCorpusPersona; model: string }> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "OPENROUTER_API_KEY is not set. Add it to .env.local (see .env.example).",
+      "GROQ_API_KEY is not set. Add it to .env.local (see .env.example).",
     );
   }
   const { result, model } = await runWithFallback(

@@ -7,22 +7,29 @@
  * that call `process.loadEnvFile()` after imports. Reading env at call
  * time avoids both traps.
  *
- * ─── OpenRouter overrides (highest priority first) ────────────────────────────
+ * ─── Groq overrides (highest priority first) ─────────────────────────────────
  *
- *   1. OPENROUTER_EXTRACT_MODELS / OPENROUTER_MERGE_MODELS  (per-stage list)
- *   2. OPENROUTER_EXTRACT_MODEL  / OPENROUTER_MERGE_MODEL   (per-stage single)
- *   3. OPENROUTER_MODELS                                    (master list)
- *   4. OPENROUTER_MODEL                                     (master single)
- *   5. baked-in default                                     (claude-sonnet-4.5)
+ *   1. GROQ_EXTRACT_MODELS / GROQ_MERGE_MODELS  (per-stage list)
+ *   2. GROQ_EXTRACT_MODEL  / GROQ_MERGE_MODEL   (per-stage single)
+ *   3. GROQ_MODELS                              (master list)
+ *   4. baked-in default                         (llama-3.3-70b + llama-3.1-8b)
  *
  * Lists are comma-separated. The pipeline tries each model in order; if a
  * call fails with a transient/rate-limit error, the next model is tried.
  *
- *   OPENROUTER_MODELS=nvidia/nemotron-3-super-120b-a12b:free,qwen/qwen3-next-80b-a3b-instruct:free,nvidia/nemotron-nano-9b-v2:free
+ *   GROQ_MODELS=llama-3.3-70b-versatile,llama-3.1-8b-instant
  */
 
-const OPENROUTER_DEFAULT = "anthropic/claude-sonnet-4.5";
-const GROQ_DEFAULT = "llama-3.3-70b-versatile";
+// Models verified to support Groq's `response_format: json_schema` mode (which
+// the AI SDK `generateObject` uses). Llama 3.x and Qwen3 on Groq currently
+// reject json_schema — keep them off this list. See:
+//   https://console.groq.com/docs/structured-outputs#supported-models
+const GROQ_EXTRACT_DEFAULTS = [
+  "openai/gpt-oss-120b",
+  "meta-llama/llama-4-scout-17b-16e-instruct",
+];
+// Chat streaming uses plain JSON-free text, so any Groq chat model works.
+const GROQ_CHAT_DEFAULT = "llama-3.3-70b-versatile";
 
 function parseList(value: string | undefined): string[] {
   if (!value) return [];
@@ -32,39 +39,37 @@ function parseList(value: string | undefined): string[] {
     .filter((s) => s.length > 0);
 }
 
-function openrouterMasterList(): string[] {
-  const list = parseList(process.env.OPENROUTER_MODELS);
+function groqMasterList(): string[] {
+  const list = parseList(process.env.GROQ_MODELS);
   if (list.length > 0) return list;
-  const single = process.env.OPENROUTER_MODEL;
-  if (single && single.trim().length > 0) return [single.trim()];
-  return [OPENROUTER_DEFAULT];
+  return GROQ_EXTRACT_DEFAULTS;
 }
 
 // Per-chunk style extraction (offline, quality-sensitive). Returns an
 // ordered fallback list — first entry is preferred, later entries are
 // tried only if earlier ones return transient/rate-limit errors.
 export function extractModels(): string[] {
-  const list = parseList(process.env.OPENROUTER_EXTRACT_MODELS);
+  const list = parseList(process.env.GROQ_EXTRACT_MODELS);
   if (list.length > 0) return list;
-  const single = process.env.OPENROUTER_EXTRACT_MODEL;
+  const single = process.env.GROQ_EXTRACT_MODEL;
   if (single && single.trim().length > 0) return [single.trim()];
-  return openrouterMasterList();
+  return groqMasterList();
 }
 
 // Reduce N chunk extractions to one consolidated persona. Same fallback
 // semantics as extractModels.
 export function mergeModels(): string[] {
-  const list = parseList(process.env.OPENROUTER_MERGE_MODELS);
+  const list = parseList(process.env.GROQ_MERGE_MODELS);
   if (list.length > 0) return list;
-  const single = process.env.OPENROUTER_MERGE_MODEL;
+  const single = process.env.GROQ_MERGE_MODEL;
   if (single && single.trim().length > 0) return [single.trim()];
-  return openrouterMasterList();
+  return groqMasterList();
 }
 
 // Realtime chat with the persona (latency-sensitive). Single model only —
 // streaming chat can't transparently fail over mid-response.
 export function chatModel(): string {
-  return process.env.GROQ_CHAT_MODEL ?? GROQ_DEFAULT;
+  return process.env.GROQ_CHAT_MODEL ?? GROQ_CHAT_DEFAULT;
 }
 
 // ─── Failure classification ───────────────────────────────────────────────────

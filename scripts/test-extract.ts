@@ -3,7 +3,7 @@
  *
  *   npm run script:extract
  *
- * Without OPENROUTER_API_KEY: chunks Thatcher's Falklands speeches and prints
+ * Without GROQ_API_KEY: chunks Thatcher's Falklands speeches and prints
  * sizes (no LLM call). With the key set in .env.local: runs the full
  * extraction on chunk 1 and prints the structured result.
  */
@@ -70,8 +70,8 @@ async function main() {
   });
 
   div("3. Extract style from chunk 1");
-  if (!process.env.OPENROUTER_API_KEY) {
-    console.log("⚠ OPENROUTER_API_KEY not set — skipping extraction call.");
+  if (!process.env.GROQ_API_KEY) {
+    console.log("⚠ GROQ_API_KEY not set — skipping extraction call.");
     console.log("  Add it to .env.local and re-run to see the LLM output.");
     return;
   }

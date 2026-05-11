@@ -6,7 +6,7 @@
  * Default target: Boris Johnson (modern PM — server-side memberId filter is
  * fast and cheap). Pass `--thatcher` for the historical attribution path.
  *
- * Without OPENROUTER_API_KEY: runs only fetch + chunk and reports sizes.
+ * Without GROQ_API_KEY: runs only fetch + chunk and reports sizes.
  * With the key set: runs the full pipeline and writes
  *   data/personas/{slug}.md
  *   data/personas/{slug}.examples.json
@@ -69,7 +69,7 @@ const div = (label: string) =>
 async function main() {
   console.log(`Statesmen AI · build persona: ${target.name} (${target.slug})`);
 
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!process.env.GROQ_API_KEY) {
     div("Pre-flight (no LLM key — running fetch + chunk only)");
     const t0 = Date.now();
     const contributions = await collectContributions(target.fetch);
@@ -88,7 +88,7 @@ async function main() {
       console.log(`  · chunk ${i + 1}: ${countTokens(c).toLocaleString()} tokens`),
     );
     console.log(
-      "\nUpstream pipeline verified. Add OPENROUTER_API_KEY to run extraction + merge.",
+      "\nUpstream pipeline verified. Add GROQ_API_KEY to run extraction + merge.",
     );
     return;
   }
