@@ -182,14 +182,19 @@ async function callOnce<S extends z.ZodTypeAny>(
     // No retries here. The fallback list is the retry mechanism — internal
     // retries waste rate-limit quota on the same already-throttled upstream.
     maxRetries: 0,
-    // Disable hidden reasoning/chain-of-thought tokens. The extraction is a
-    // structured pattern-matching task — reasoning adds latency (10–50K
-    // hidden tokens on models like nvidia/nemotron-*-super) without
-    // measurable quality gain, and pushes calls past the per-call timeout.
+    // Suppress reasoning/CoT tokens on models that emit them. Combined
+    // signals because no single field is universally honoured:
+    //   • enabled: false   — some providers respect this and skip reasoning
+    //   • effort: "none"   — the documented OpenRouter way to set zero effort
+    //   • exclude: true    — for models that reason regardless (e.g. NVIDIA
+    //                        Nemotron), keep reasoning server-side but
+    //                        omit it from the response so we don't pay
+    //                        latency for streaming/parsing it. Verified
+    //                        on nemotron-nano-9b-v2:free: 2.3s vs 8.3s.
     // No-op on non-reasoning models.
     providerOptions: {
       openrouter: {
-        reasoning: { enabled: false, effort: "none" },
+        reasoning: { enabled: false, effort: "none", exclude: true },
       },
     },
   });

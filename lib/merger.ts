@@ -98,13 +98,14 @@ async function callOnce(
     // retries just multiply rate-limit pressure on already-throttled
     // upstreams.
     maxRetries: 0,
-    // Disable hidden reasoning/chain-of-thought tokens on the merge call.
-    // Same rationale as the extractor: merging is a structured
-    // deduplication/synthesis task, not multi-step problem solving.
+    // Suppress reasoning/CoT tokens on models that emit them. See extractor.ts
+    // for the per-field rationale (enabled/effort/exclude are all set so at
+    // least one is honoured per provider, and `exclude: true` keeps NVIDIA
+    // Nemotron's unconditional reasoning out of the streamed response).
     // No-op on non-reasoning models.
     providerOptions: {
       openrouter: {
-        reasoning: { enabled: false, effort: "none" },
+        reasoning: { enabled: false, effort: "none", exclude: true },
       },
     },
   });
