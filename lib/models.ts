@@ -85,7 +85,14 @@ function isAbortOrTimeoutChain(err: unknown): boolean {
   if (err === null || typeof err !== "object") return false;
   const e = err as { name?: unknown; cause?: unknown };
   if (typeof e.name === "string") {
-    if (e.name === "AbortError" || e.name === "TimeoutError") return true;
+    // AbortError ONLY: signals a deliberate cancellation from the caller side
+    // (client disconnect, global deadline signal aborting, etc.) — don't
+    // walk the fallback list. TimeoutError from AbortSignal.timeout is NOT
+    // included here on purpose: that's the per-attempt timeout, the whole
+    // reason the fallback list exists. The orchestrator's explicit
+    // `if (opts.signal?.aborted) throw err;` check is what stops walks on
+    // global-deadline TimeoutError — by then opts.signal is aborted.
+    if (e.name === "AbortError") return true;
   }
   if (e.cause && typeof e.cause === "object") {
     return isAbortOrTimeoutChain(e.cause);
