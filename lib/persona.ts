@@ -251,20 +251,46 @@ export function verifyVerbatimExamples(
 
 // ─── Concurrency-limited Promise.all ──────────────────────────────────────────
 
+/**
+ * Run `fn(item, i, signal)` over `items` with at most `limit` workers
+ * active at a time. A shared `AbortController` is created internally and
+ * combined with `outerSignal` (if any) via `AbortSignal.any`. If any
+ * worker rejects, the shared controller is aborted so sibling workers
+ * cancel their in-flight LLM calls instead of burning the global budget
+ * walking their own fallback lists. The first rejection propagates out
+ * of `Promise.all`; subsequent abort errors from siblings surface as
+ * unobserved rejections within their worker but `Promise.all` only
+ * raises the first.
+ */
 async function mapWithConcurrency<T, R>(
   items: T[],
   limit: number,
-  fn: (item: T, index: number) => Promise<R>,
+  fn: (item: T, index: number, signal: AbortSignal) => Promise<R>,
+  outerSignal?: AbortSignal,
 ): Promise<R[]> {
   if (items.length === 0) return [];
+  const ctrl = new AbortController();
+  const innerSignal: AbortSignal = outerSignal
+    ? AbortSignal.any([outerSignal, ctrl.signal])
+    : ctrl.signal;
   const results: R[] = new Array(items.length);
   let nextIndex = 0;
   const workerCount = Math.min(limit, items.length);
   async function worker(): Promise<void> {
     while (true) {
+      if (innerSignal.aborted) return;
       const i = nextIndex++;
       if (i >= items.length) return;
-      results[i] = await fn(items[i], i);
+      try {
+        results[i] = await fn(items[i], i, innerSignal);
+      } catch (err) {
+        // First worker to throw cancels its peers' in-flight LLM calls
+        // so the global build budget isn't burned walking multiple
+        // fallback lists in parallel after one has already failed
+        // terminally.
+        if (!ctrl.signal.aborted) ctrl.abort();
+        throw err;
+      }
     }
   }
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
@@ -368,11 +394,15 @@ export async function buildPersona(
     // Concurrency-capped parallel extraction. The startModelIndex rotates
     // each chunk's preferred model so simultaneous calls land on different
     // upstream providers — important for free-tier OpenRouter where each
-    // model has its own thin RPM budget.
+    // model has its own thin RPM budget. The `innerSignal` is the build's
+    // outer signal composed with a shared per-batch AbortController; if
+    // one chunk throws after its fallback walk, the other workers cancel
+    // their in-flight LLM calls instead of burning more of the global
+    // budget on their own fallback walks.
     const extractions = await mapWithConcurrency(
       chunks,
       CHUNK_EXTRACTION_CONCURRENCY,
-      async (chunk, i) => {
+      async (chunk, i, innerSignal) => {
         emit({
           type: "extract_start",
           chunkIndex: i,
@@ -380,7 +410,7 @@ export async function buildPersona(
         });
         const result = await extractStyleFromChunk(opts.name, chunk, {
           startModelIndex: i,
-          signal: opts.signal,
+          signal: innerSignal,
           perCallTimeoutMs: PER_CALL_TIMEOUT_MS,
           onAttempt: (attempt) => {
             if (attempt.kind === "failure") {
@@ -398,6 +428,7 @@ export async function buildPersona(
         });
         return result;
       },
+      opts.signal,
     );
 
     emit({ type: "merge_start" });
