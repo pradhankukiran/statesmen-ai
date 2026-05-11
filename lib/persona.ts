@@ -33,6 +33,7 @@ import {
 } from "./extractor";
 import { mergeExtractions, type MergedPersona } from "./merger";
 import { getMember } from "./members";
+import { summariseError } from "./models";
 
 /**
  * If the full corpus fits within this many tokens, skip chunking + merge
@@ -318,173 +319,243 @@ export async function buildPersona(
   opts: BuildPersonaOptions,
 ): Promise<Persona> {
   const emit = opts.onProgress ?? (() => {});
-
-  emit({ type: "fetch_start" });
-  // For memberId-sourced personas, kick off a member-profile lookup in
-  // parallel with the contributions fetch so we can record `endedAt` for
-  // the era-cutoff in the rendered persona. Best-effort: a Members API
-  // failure should not fail the build, just leave `endedAt` undefined.
-  const memberPromise =
-    opts.fetch.kind === "memberId"
-      ? getMember(opts.fetch.memberId).catch((err) => {
-          console.error(
-            `[persona] Members API lookup failed for memberId=${
-              (opts.fetch as { memberId: number }).memberId
-            }:`,
-            err instanceof Error ? err.message : err,
-          );
-          return null;
-        })
-      : Promise.resolve(null);
-  const contributions = await collectContributions(opts.fetch);
-  emit({ type: "fetch_done", count: contributions.length });
-
-  if (contributions.length === 0) {
-    throw new Error(`No contributions collected for ${opts.name}`);
-  }
-
-  const MIN_CONTRIBUTIONS = 20;
-  if (contributions.length < MIN_CONTRIBUTIONS) {
-    throw new Error(
-      `Not enough public speeches found for ${opts.name} ` +
-        `(${contributions.length} contributions, minimum ${MIN_CONTRIBUTIONS}). ` +
-        `This person may not have a rich enough public Hansard record to build a faithful persona.`,
-    );
-  }
-
-  const text = contributions.map((c) => c.text).join("\n\n");
-  const totalTokens = countTokens(text);
-
-  let body: MergedPersona;
-  let chunkCount: number;
-  let builtBy: PersonaMeta["builtBy"];
-
-  if (totalTokens <= SINGLE_CALL_THRESHOLD) {
-    // Single-call path: full corpus fits in one extraction call. Uses
-    // `extractFullCorpusPersona` whose schema asks for merge-sized arrays so
-    // the persona has the same depth (15-30 vocab, 20-30 examples, etc.) as
-    // the chunked + merge pipeline produces.
-    chunkCount = 1;
-    emit({ type: "chunk_done", chunkCount, totalTokens });
-    emit({ type: "extract_start", chunkIndex: 0, totalChunks: 1 });
-    const { persona, model } = await extractFullCorpusPersona(opts.name, text, {
-      signal: opts.signal,
-      perCallTimeoutMs: PER_CALL_TIMEOUT_MS,
-      onAttempt: (attempt) => {
-        if (attempt.kind === "failure") {
-          console.error(
-            `[persona] single-call extract failed on ${attempt.model} ` +
-              `(${attempt.index + 1}/${attempt.total}): ${attempt.error}`,
-          );
-        }
-      },
+  const { slug, signal } = opts;
+  const buildStartMs = Date.now();
+  const elapsed = (): number => Date.now() - buildStartMs;
+  // Structured stage logger. One line per pipeline transition with the
+  // slug, elapsed-ms, and any stage-specific metadata. Reads cleanly in
+  // Vercel logs and pairs with `summariseError` in the failure path so
+  // an incident can be traced end-to-end from a single grep.
+  const logStage = (
+    stage: string,
+    data: Record<string, unknown> = {},
+  ): void => {
+    console.log(`[persona] stage: ${stage}`, {
+      slug,
+      elapsedMs: elapsed(),
+      ...data,
     });
-    emit({ type: "extract_done", chunkIndex: 0, totalChunks: 1 });
-    body = persona;
-    builtBy = { path: "single-call", model };
-  } else {
-    // Chunked + merge path (rare: huge corpora exceeding the single-call
-    // threshold).
-    const chunks = chunkByTokens(text, {
-      maxTokens: opts.maxTokensPerChunk ?? 8000,
-    });
-    chunkCount = chunks.length;
-    emit({ type: "chunk_done", chunkCount, totalTokens });
+  };
+  // Top-level abort check at each pipeline boundary so we get a clean
+  // stage marker before a deadline-fire / client-disconnect propagates
+  // out via the next LLM call. Without this, the first observable abort
+  // log lives inside the extractor and the persona-level context (which
+  // stage we were about to enter) is lost.
+  const checkAborted = (stage: string): void => {
+    if (signal?.aborted) {
+      logStage(`${stage}-aborted`);
+      const err = new Error(`[persona] aborted before ${stage}`);
+      err.name = "AbortError";
+      throw err;
+    }
+  };
 
-    // Concurrency-capped parallel extraction. The startModelIndex rotates
-    // each chunk's preferred model so simultaneous calls land on different
-    // upstream providers — important for free-tier OpenRouter where each
-    // model has its own thin RPM budget. The `innerSignal` is the build's
-    // outer signal composed with a shared per-batch AbortController; if
-    // one chunk throws after its fallback walk, the other workers cancel
-    // their in-flight LLM calls instead of burning more of the global
-    // budget on their own fallback walks.
-    const extractions = await mapWithConcurrency(
-      chunks,
-      CHUNK_EXTRACTION_CONCURRENCY,
-      async (chunk, i, innerSignal) => {
-        emit({
-          type: "extract_start",
-          chunkIndex: i,
-          totalChunks: chunks.length,
-        });
-        const result = await extractStyleFromChunk(opts.name, chunk, {
-          startModelIndex: i,
-          signal: innerSignal,
+  try {
+    logStage("build-start", { name: opts.name });
+
+    checkAborted("fetch");
+    emit({ type: "fetch_start" });
+    // For memberId-sourced personas, kick off a member-profile lookup in
+    // parallel with the contributions fetch so we can record `endedAt` for
+    // the era-cutoff in the rendered persona. Best-effort: a Members API
+    // failure should not fail the build, just leave `endedAt` undefined.
+    const memberPromise =
+      opts.fetch.kind === "memberId"
+        ? getMember(opts.fetch.memberId).catch((err) => {
+            console.error(
+              `[persona] Members API lookup failed for memberId=${
+                (opts.fetch as { memberId: number }).memberId
+              }:`,
+              err instanceof Error ? err.message : err,
+            );
+            return null;
+          })
+        : Promise.resolve(null);
+    const contributions = await collectContributions(opts.fetch);
+    emit({ type: "fetch_done", count: contributions.length });
+    logStage("contributions-fetched", { count: contributions.length });
+
+    if (contributions.length === 0) {
+      throw new Error(`No contributions collected for ${opts.name}`);
+    }
+
+    const MIN_CONTRIBUTIONS = 20;
+    if (contributions.length < MIN_CONTRIBUTIONS) {
+      throw new Error(
+        `Not enough public speeches found for ${opts.name} ` +
+          `(${contributions.length} contributions, minimum ${MIN_CONTRIBUTIONS}). ` +
+          `This person may not have a rich enough public Hansard record to build a faithful persona.`,
+      );
+    }
+
+    const text = contributions.map((c) => c.text).join("\n\n");
+    const totalTokens = countTokens(text);
+
+    let body: MergedPersona;
+    let chunkCount: number;
+    let builtBy: PersonaMeta["builtBy"];
+
+    if (totalTokens <= SINGLE_CALL_THRESHOLD) {
+      // Single-call path: full corpus fits in one extraction call. Uses
+      // `extractFullCorpusPersona` whose schema asks for merge-sized arrays so
+      // the persona has the same depth (15-30 vocab, 20-30 examples, etc.) as
+      // the chunked + merge pipeline produces.
+      chunkCount = 1;
+      emit({ type: "chunk_done", chunkCount, totalTokens });
+
+      checkAborted("single-call-extract");
+      logStage("single-call-start", { totalTokens });
+      emit({ type: "extract_start", chunkIndex: 0, totalChunks: 1 });
+      const { persona, model } = await extractFullCorpusPersona(
+        opts.name,
+        text,
+        {
+          signal,
           perCallTimeoutMs: PER_CALL_TIMEOUT_MS,
           onAttempt: (attempt) => {
             if (attempt.kind === "failure") {
               console.error(
-                `[persona] chunk ${i} extract failed on ${attempt.model} ` +
+                `[persona] single-call extract failed on ${attempt.model} ` +
                   `(${attempt.index + 1}/${attempt.total}): ${attempt.error}`,
               );
             }
           },
-        });
-        emit({
-          type: "extract_done",
-          chunkIndex: i,
-          totalChunks: chunks.length,
-        });
-        return result;
-      },
-      opts.signal,
-    );
+        },
+      );
+      emit({ type: "extract_done", chunkIndex: 0, totalChunks: 1 });
+      logStage("single-call-done", { model });
+      body = persona;
+      builtBy = { path: "single-call", model };
+    } else {
+      // Chunked + merge path (rare: huge corpora exceeding the single-call
+      // threshold).
+      const chunks = chunkByTokens(text, {
+        maxTokens: opts.maxTokensPerChunk ?? 8000,
+      });
+      chunkCount = chunks.length;
+      emit({ type: "chunk_done", chunkCount, totalTokens });
 
-    emit({ type: "merge_start" });
-    // Stagger merge's first-pick model away from chunk 0's model.
-    const merged = await mergeExtractions(opts.name, extractions, {
-      startModelIndex: chunks.length,
-      signal: opts.signal,
-      perCallTimeoutMs: PER_CALL_TIMEOUT_MS,
+      checkAborted("chunked-extract");
+      logStage("chunked-start", {
+        chunkCount,
+        totalTokens,
+        concurrency: CHUNK_EXTRACTION_CONCURRENCY,
+      });
+
+      // Concurrency-capped parallel extraction. The startModelIndex rotates
+      // each chunk's preferred model so simultaneous calls land on different
+      // upstream providers — important for free-tier OpenRouter where each
+      // model has its own thin RPM budget. The `innerSignal` is the build's
+      // outer signal composed with a shared per-batch AbortController; if
+      // one chunk throws after its fallback walk, the other workers cancel
+      // their in-flight LLM calls instead of burning more of the global
+      // budget on their own fallback walks.
+      const extractions = await mapWithConcurrency(
+        chunks,
+        CHUNK_EXTRACTION_CONCURRENCY,
+        async (chunk, i, innerSignal) => {
+          emit({
+            type: "extract_start",
+            chunkIndex: i,
+            totalChunks: chunks.length,
+          });
+          const result = await extractStyleFromChunk(opts.name, chunk, {
+            startModelIndex: i,
+            signal: innerSignal,
+            perCallTimeoutMs: PER_CALL_TIMEOUT_MS,
+            onAttempt: (attempt) => {
+              if (attempt.kind === "failure") {
+                console.error(
+                  `[persona] chunk ${i} extract failed on ${attempt.model} ` +
+                    `(${attempt.index + 1}/${attempt.total}): ${attempt.error}`,
+                );
+              }
+            },
+          });
+          emit({
+            type: "extract_done",
+            chunkIndex: i,
+            totalChunks: chunks.length,
+          });
+          logStage(`chunk-${i + 1}-done`, {
+            chunkIndex: i,
+            totalChunks: chunks.length,
+          });
+          return result;
+        },
+        signal,
+      );
+
+      checkAborted("merge");
+      emit({ type: "merge_start" });
+      logStage("merge-start", { chunkCount });
+      // Stagger merge's first-pick model away from chunk 0's model.
+      const merged = await mergeExtractions(opts.name, extractions, {
+        startModelIndex: chunks.length,
+        signal,
+        perCallTimeoutMs: PER_CALL_TIMEOUT_MS,
+      });
+      body = merged.persona;
+      builtBy = { path: "chunked-merge", model: merged.model };
+      emit({ type: "merge_done" });
+      logStage("merge-done", { model: merged.model });
+    }
+
+    // Verify verbatim quotes survive a substring check against the source
+    // corpus. Hallucinated examples are silently dropped; the count is
+    // recorded in meta for ops visibility.
+    const verified = verifyVerbatimExamples(body.examples, text);
+    if (verified.dropped > 0) {
+      console.warn(
+        `[persona] dropped ${verified.dropped} hallucinated example(s) ` +
+          `for ${opts.name}; ${verified.kept.length} verbatim quote(s) remain.`,
+      );
+    }
+    body = { ...body, examples: verified.kept };
+    logStage("verify-done", {
+      kept: verified.kept.length,
+      dropped: verified.dropped,
     });
-    body = merged.persona;
-    builtBy = { path: "chunked-merge", model: merged.model };
-    emit({ type: "merge_done" });
+
+    emit({ type: "render_done" });
+    logStage("render-done");
+
+    const member = await memberPromise;
+
+    return {
+      meta: {
+        name: opts.name,
+        slug: opts.slug,
+        source: opts.fetch.kind,
+        memberId:
+          opts.fetch.kind === "memberId" ? opts.fetch.memberId : undefined,
+        attribution:
+          opts.fetch.kind === "attribution"
+            ? {
+                label: opts.fetch.label,
+                startDate: opts.fetch.startDate,
+                endDate: opts.fetch.endDate,
+              }
+            : undefined,
+        endedAt:
+          opts.fetch.kind === "memberId" ? member?.endedAt ?? null : undefined,
+        contributionCount: contributions.length,
+        chunkCount,
+        totalTokens,
+        builtBy,
+        hallucinatedExampleCount: verified.dropped,
+        generatedAt: new Date().toISOString(),
+      },
+      body,
+    };
+  } catch (err) {
+    console.error(`[persona] build failed`, {
+      slug,
+      elapsedMs: elapsed(),
+      ...summariseError(err),
+    });
+    throw err;
   }
-
-  // Verify verbatim quotes survive a substring check against the source
-  // corpus. Hallucinated examples are silently dropped; the count is
-  // recorded in meta for ops visibility.
-  const verified = verifyVerbatimExamples(body.examples, text);
-  if (verified.dropped > 0) {
-    console.warn(
-      `[persona] dropped ${verified.dropped} hallucinated example(s) ` +
-        `for ${opts.name}; ${verified.kept.length} verbatim quote(s) remain.`,
-    );
-  }
-  body = { ...body, examples: verified.kept };
-
-  emit({ type: "render_done" });
-
-  const member = await memberPromise;
-
-  return {
-    meta: {
-      name: opts.name,
-      slug: opts.slug,
-      source: opts.fetch.kind,
-      memberId:
-        opts.fetch.kind === "memberId" ? opts.fetch.memberId : undefined,
-      attribution:
-        opts.fetch.kind === "attribution"
-          ? {
-              label: opts.fetch.label,
-              startDate: opts.fetch.startDate,
-              endDate: opts.fetch.endDate,
-            }
-          : undefined,
-      endedAt:
-        opts.fetch.kind === "memberId" ? member?.endedAt ?? null : undefined,
-      contributionCount: contributions.length,
-      chunkCount,
-      totalTokens,
-      builtBy,
-      hallucinatedExampleCount: verified.dropped,
-      generatedAt: new Date().toISOString(),
-    },
-    body,
-  };
 }
 
 // ─── Renderers ───────────────────────────────────────────────────────────────
