@@ -2,7 +2,7 @@ import { z } from "zod";
 import { generateObject } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { EXTRACT_SYSTEM, buildExtractPrompt } from "./prompts/extract";
-import { extractModels, isFallbackableError } from "./models";
+import { extractModels, isFallbackableError, summariseError } from "./models";
 
 // ─── Output schemas ───────────────────────────────────────────────────────────
 //
@@ -230,6 +230,7 @@ async function runWithFallback<S extends z.ZodTypeAny>(
     const timeoutSignal = AbortSignal.timeout(perCallTimeoutMs);
     const signal = composeSignals([opts.signal, timeoutSignal]);
 
+    const attemptStart = Date.now();
     try {
       const result = await callOnce(
         apiKey,
@@ -241,11 +242,37 @@ async function runWithFallback<S extends z.ZodTypeAny>(
         maxOutputTokens,
         signal,
       );
+      console.log(`[extract] model succeeded: ${modelId}`, {
+        attempt: i + 1,
+        elapsedMs: Date.now() - attemptStart,
+      });
       opts.onAttempt?.({ kind: "success", model: modelId, index: i, total: ordered.length });
       return { result, model: modelId };
     } catch (err) {
       lastError = err;
       const errMessage = err instanceof Error ? err.message : String(err);
+      // Caller-aborted (route shutdown / client disconnect) — stop walking.
+      // Log as abort, not failure.
+      if (opts.signal?.aborted) {
+        console.warn(`[extract] aborted on ${modelId}`, {
+          attempt: i + 1,
+          elapsedMs: Date.now() - attemptStart,
+        });
+        opts.onAttempt?.({
+          kind: "failure",
+          model: modelId,
+          index: i,
+          total: ordered.length,
+          error: errMessage,
+        });
+        throw err;
+      }
+      console.error(`[extract] model failed: ${modelId}`, {
+        attempt: i + 1,
+        total: ordered.length,
+        elapsedMs: Date.now() - attemptStart,
+        ...summariseError(err),
+      });
       opts.onAttempt?.({
         kind: "failure",
         model: modelId,
@@ -253,8 +280,6 @@ async function runWithFallback<S extends z.ZodTypeAny>(
         total: ordered.length,
         error: errMessage,
       });
-      // Caller-aborted (route shutdown / client disconnect) — stop walking.
-      if (opts.signal?.aborted) throw err;
       if (!isFallbackableError(err)) throw err;
       // Otherwise: try next model.
     }

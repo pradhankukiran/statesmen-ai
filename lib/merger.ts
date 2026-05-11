@@ -3,7 +3,7 @@ import { generateObject } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { MERGE_SYSTEM, buildMergePrompt } from "./prompts/merge";
 import type { Extraction } from "./extractor";
-import { mergeModels, isFallbackableError } from "./models";
+import { mergeModels, isFallbackableError, summariseError } from "./models";
 
 // ─── Schema for the consolidated persona ──────────────────────────────────────
 
@@ -141,10 +141,12 @@ export async function mergeExtractions(
   const perCallTimeoutMs = opts.perCallTimeoutMs ?? DEFAULT_PER_CALL_TIMEOUT_MS;
 
   let lastError: unknown;
-  for (const modelId of ordered) {
+  for (let i = 0; i < ordered.length; i++) {
+    const modelId = ordered[i];
     const timeoutSignal = AbortSignal.timeout(perCallTimeoutMs);
     const signal = composeSignals([opts.signal, timeoutSignal]);
 
+    const attemptStart = Date.now();
     try {
       const persona = await callOnce(
         apiKey,
@@ -154,10 +156,26 @@ export async function mergeExtractions(
         temperature,
         signal,
       );
+      console.log(`[merge] model succeeded: ${modelId}`, {
+        attempt: i + 1,
+        elapsedMs: Date.now() - attemptStart,
+      });
       return { persona, model: modelId };
     } catch (err) {
       lastError = err;
-      if (opts.signal?.aborted) throw err;
+      if (opts.signal?.aborted) {
+        console.warn(`[merge] aborted on ${modelId}`, {
+          attempt: i + 1,
+          elapsedMs: Date.now() - attemptStart,
+        });
+        throw err;
+      }
+      console.error(`[merge] model failed: ${modelId}`, {
+        attempt: i + 1,
+        total: ordered.length,
+        elapsedMs: Date.now() - attemptStart,
+        ...summariseError(err),
+      });
       if (!isFallbackableError(err)) throw err;
     }
   }
