@@ -70,6 +70,30 @@ export function chatModel(): string {
 // ─── Failure classification ───────────────────────────────────────────────────
 
 /**
+ * Walk the full `cause` chain looking for an abort or timeout. If ANY link in
+ * the chain is an `AbortError`/`TimeoutError`, the outer error is not
+ * fallbackable — the caller (Vercel function timeout, client disconnect, route
+ * shutdown) asked us to stop.
+ *
+ * This matters because the AI SDK wraps upstream errors as `AI_APICallError`
+ * with the real cause one level deep — e.g. a per-call 60s timeout surfaces
+ * as `AI_APICallError { cause: AbortError }`. Detecting only the outer name
+ * would let such timeouts walk the entire fallback list and burn the whole
+ * function-timeout budget.
+ */
+function isAbortOrTimeoutChain(err: unknown): boolean {
+  if (err === null || typeof err !== "object") return false;
+  const e = err as { name?: unknown; cause?: unknown };
+  if (typeof e.name === "string") {
+    if (e.name === "AbortError" || e.name === "TimeoutError") return true;
+  }
+  if (e.cause && typeof e.cause === "object") {
+    return isAbortOrTimeoutChain(e.cause);
+  }
+  return false;
+}
+
+/**
  * Whether an LLM error is worth retrying against the next model in the
  * fallback list. Conservative: anything that looks like rate-limiting,
  * upstream provider failure, or a transient backend issue qualifies.
@@ -78,19 +102,21 @@ export function chatModel(): string {
 export function isFallbackableError(err: unknown): boolean {
   if (err === null || typeof err !== "object") return false;
 
+  // Step 1: walk the entire cause chain looking for abort/timeout. This MUST
+  // run before any positive-return branch below, because the AI SDK wraps
+  // aborted upstream calls as `AI_APICallError { cause: AbortError }` and the
+  // outer name would otherwise be classified as fallbackable.
+  if (isAbortOrTimeoutChain(err)) return false;
+
+  // Step 2: standard fallback-eligible classification on the outer error,
+  // with a final cause-unwrap for nested transient failures (ECONNRESET, etc.)
+  // that didn't include an abort/timeout anywhere in their chain.
   const e = err as {
     statusCode?: unknown;
     message?: unknown;
     name?: unknown;
     cause?: unknown;
   };
-
-  // Aborts are NOT fallbackable: they signal the caller asked us to stop
-  // (Vercel function timeout, client disconnect, route shutdown). Walking the
-  // fallback list after an abort wastes the rest of the timeout budget on
-  // calls that will themselves abort.
-  if (typeof e.name === "string" && e.name === "AbortError") return false;
-  if (typeof e.name === "string" && e.name === "TimeoutError") return false;
 
   if (typeof e.statusCode === "number") {
     if (e.statusCode === 402) return true; // out of credits — try cheaper/free model
@@ -134,15 +160,79 @@ export function isFallbackableError(err: unknown): boolean {
     if (e.name === "AI_RetryError") return true;
     if (e.name === "AI_APICallError" && (e.statusCode === undefined || e.statusCode === 0)) {
       // Upstream connection-level failure (DNS, reset, etc.) — worth retrying.
+      // Note: abort/timeout chains were already filtered above, so we won't
+      // mis-classify a wrapped abort as fallbackable here.
       return true;
     }
   }
 
   // Unwrap `cause` chains: undici/fetch errors often nest the real reason
-  // (ECONNRESET, AbortError, etc.) one level deep.
+  // (ECONNRESET, etc.) one level deep. Aborts/timeouts were already filtered.
   if (e.cause && typeof e.cause === "object") {
     return isFallbackableError(e.cause);
   }
 
   return false;
+}
+
+// ─── Error summarisation for structured logs ──────────────────────────────────
+
+/**
+ * A flat, log-friendly view of an LLM error. Captures the outer error's
+ * identifying fields plus the innermost cause's name, so a single log line
+ * shows both what was thrown and what the underlying failure was.
+ */
+export type ErrorSummary = {
+  name: string | undefined;
+  message: string | undefined;
+  statusCode: number | undefined;
+  isFallbackable: boolean;
+  causeName: string | undefined;
+};
+
+/**
+ * Reduce an arbitrary thrown value to an `ErrorSummary`. Pure — no I/O, no
+ * logging. Intended for `console.error({ ...summariseError(err) })` patterns
+ * in the extract/merge/persona pipelines.
+ */
+export function summariseError(err: unknown): ErrorSummary {
+  if (err === null || typeof err !== "object") {
+    return {
+      name: undefined,
+      message: typeof err === "string" ? err : undefined,
+      statusCode: undefined,
+      isFallbackable: false,
+      causeName: undefined,
+    };
+  }
+
+  const e = err as {
+    name?: unknown;
+    message?: unknown;
+    statusCode?: unknown;
+    cause?: unknown;
+  };
+
+  return {
+    name: typeof e.name === "string" ? e.name : undefined,
+    message: typeof e.message === "string" ? e.message : undefined,
+    statusCode: typeof e.statusCode === "number" ? e.statusCode : undefined,
+    isFallbackable: isFallbackableError(err),
+    causeName: innermostCauseName(err),
+  };
+}
+
+function innermostCauseName(err: unknown): string | undefined {
+  if (err === null || typeof err !== "object") return undefined;
+  const e = err as { name?: unknown; cause?: unknown };
+  if (e.cause && typeof e.cause === "object") {
+    const deeper = innermostCauseName(e.cause);
+    if (deeper !== undefined) return deeper;
+    const causeName = (e.cause as { name?: unknown }).name;
+    if (typeof causeName === "string") return causeName;
+  }
+  // No deeper cause — return undefined so the caller distinguishes
+  // "outer error only" from "wrapped cause". The outer name is already on
+  // the summary's `name` field.
+  return undefined;
 }
