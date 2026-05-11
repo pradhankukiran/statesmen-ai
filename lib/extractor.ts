@@ -22,44 +22,38 @@ export const ExtractionSchema = z.object({
     .array(z.string())
     .min(5)
     .max(15)
-    .describe("5–15 distinctive words or pet phrases this person uses"),
+    .describe("Distinctive words or pet phrases this person uses"),
   sentencePatterns: z
     .string()
-    .describe(
-      "1–2 sentences describing typical sentence structure (length, rhythm, hedging, etc.)",
-    ),
+    .describe("Typical sentence structure (length, rhythm, hedging, etc.)"),
   rhetoricalDevices: z
     .array(z.string())
     .min(3)
     .max(7)
-    .describe(
-      "3–7 named rhetorical patterns (e.g. 'rule of three', 'anaphora', 'antithesis')",
-    ),
+    .describe("Named rhetorical patterns (e.g. rule of three, anaphora, antithesis)"),
   tone: z
     .string()
-    .describe("1 sentence on emotional and intellectual register"),
+    .describe("Emotional and intellectual register"),
   topics: z
     .array(z.string())
     .min(5)
     .max(10)
-    .describe("5–10 themes that appear in this chunk"),
+    .describe("Themes that appear in this chunk"),
   openings: z
     .array(z.string())
     .min(3)
     .max(5)
-    .describe("3–5 typical phrase openings used by the speaker"),
+    .describe("Typical phrase openings used by the speaker"),
   closings: z
     .array(z.string())
     .min(3)
     .max(5)
-    .describe("3–5 typical phrase closings used by the speaker"),
+    .describe("Typical phrase closings used by the speaker"),
   examples: z
     .array(z.string())
-    .min(8)
-    .max(15)
-    .describe(
-      "8–15 VERBATIM quotes copied from the transcript that best exemplify the speaker's voice",
-    ),
+    .min(5)
+    .max(12)
+    .describe("Verbatim quotes copied from the transcript that exemplify the speaker's voice"),
 });
 
 export type Extraction = z.infer<typeof ExtractionSchema>;
@@ -70,52 +64,40 @@ export type Extraction = z.infer<typeof ExtractionSchema>;
 export const FullCorpusPersonaSchema = z.object({
   vocabulary: z
     .array(z.string())
-    .min(15)
-    .max(30)
-    .describe(
-      "15–30 distinctive words and pet phrases used across the corpus, deduplicated",
-    ),
+    .min(8)
+    .max(20)
+    .describe("Distinctive words and pet phrases used across the corpus, deduplicated"),
   sentencePatterns: z
     .string()
-    .describe(
-      "2–3 sentences synthesising typical sentence structure (length, rhythm, hedging, parallelism, etc.)",
-    ),
+    .describe("Synthesised typical sentence structure (length, rhythm, hedging, parallelism, etc.)"),
   rhetoricalDevices: z
     .array(z.string())
-    .min(5)
-    .max(10)
-    .describe(
-      "5–10 named rhetorical devices the speaker habitually uses",
-    ),
+    .min(3)
+    .max(8)
+    .describe("Named rhetorical devices the speaker habitually uses"),
   tone: z
     .string()
-    .describe(
-      "2–3 sentences capturing the through-line of the speaker's emotional and intellectual register",
-    ),
+    .describe("Through-line of the speaker's emotional and intellectual register"),
   topics: z
     .array(z.string())
-    .min(8)
-    .max(15)
-    .describe(
-      "8–15 cross-cutting themes that recur across the corpus",
-    ),
+    .min(5)
+    .max(12)
+    .describe("Cross-cutting themes that recur across the corpus"),
   openings: z
     .array(z.string())
-    .min(5)
-    .max(10)
-    .describe("5–10 typical phrase openings used by the speaker"),
+    .min(3)
+    .max(8)
+    .describe("Typical phrase openings used by the speaker"),
   closings: z
     .array(z.string())
-    .min(5)
-    .max(10)
-    .describe("5–10 typical phrase closings used by the speaker"),
+    .min(3)
+    .max(8)
+    .describe("Typical phrase closings used by the speaker"),
   examples: z
     .array(z.string())
-    .min(20)
-    .max(30)
-    .describe(
-      "20–30 BEST verbatim quotes selected from the corpus. Each must be a direct quote — never paraphrase.",
-    ),
+    .min(10)
+    .max(20)
+    .describe("Best verbatim quotes selected from the corpus. Each must be a direct quote — never paraphrase."),
 });
 
 export type FullCorpusPersona = z.infer<typeof FullCorpusPersonaSchema>;
@@ -207,7 +189,7 @@ async function callOnce<S extends z.ZodTypeAny>(
     // No-op on non-reasoning models.
     providerOptions: {
       openrouter: {
-        reasoning: { enabled: false },
+        reasoning: { enabled: false, effort: "none" },
       },
     },
   });

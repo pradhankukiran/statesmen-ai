@@ -10,52 +10,40 @@ import { mergeModels, isFallbackableError } from "./models";
 export const MergedPersonaSchema = z.object({
   vocabulary: z
     .array(z.string())
-    .min(15)
-    .max(30)
-    .describe(
-      "15–30 deduplicated distinctive words and pet phrases used by the speaker",
-    ),
+    .min(8)
+    .max(20)
+    .describe("Deduplicated distinctive words and pet phrases used by the speaker"),
   sentencePatterns: z
     .string()
-    .describe(
-      "2–3 sentences synthesising typical sentence structure (length, rhythm, hedging, parallelism, etc.)",
-    ),
+    .describe("Synthesised typical sentence structure (length, rhythm, hedging, parallelism, etc.)"),
   rhetoricalDevices: z
     .array(z.string())
-    .min(5)
-    .max(10)
-    .describe(
-      "5–10 deduplicated named rhetorical devices the speaker habitually uses",
-    ),
+    .min(3)
+    .max(8)
+    .describe("Deduplicated named rhetorical devices the speaker habitually uses"),
   tone: z
     .string()
-    .describe(
-      "2–3 sentences capturing the through-line of the speaker's emotional and intellectual register",
-    ),
+    .describe("Through-line of the speaker's emotional and intellectual register"),
   topics: z
     .array(z.string())
-    .min(8)
-    .max(15)
-    .describe(
-      "8–15 cross-cutting themes that recur across the speaker's corpus",
-    ),
+    .min(5)
+    .max(12)
+    .describe("Cross-cutting themes that recur across the speaker's corpus"),
   openings: z
     .array(z.string())
-    .min(5)
-    .max(10)
-    .describe("5–10 typical phrase openings used by the speaker"),
+    .min(3)
+    .max(8)
+    .describe("Typical phrase openings used by the speaker"),
   closings: z
     .array(z.string())
-    .min(5)
-    .max(10)
-    .describe("5–10 typical phrase closings used by the speaker"),
+    .min(3)
+    .max(8)
+    .describe("Typical phrase closings used by the speaker"),
   examples: z
     .array(z.string())
-    .min(20)
-    .max(30)
-    .describe(
-      "20–30 BEST verbatim quotes selected from across all chunks. Each must be a direct quote — never paraphrase.",
-    ),
+    .min(10)
+    .max(20)
+    .describe("Best verbatim quotes selected from across all chunks. Each must be a direct quote — never paraphrase."),
 });
 
 export type MergedPersona = z.infer<typeof MergedPersonaSchema>;
@@ -116,7 +104,7 @@ async function callOnce(
     // No-op on non-reasoning models.
     providerOptions: {
       openrouter: {
-        reasoning: { enabled: false },
+        reasoning: { enabled: false, effort: "none" },
       },
     },
   });
