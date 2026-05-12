@@ -7,18 +7,32 @@
  * that call `process.loadEnvFile()` after imports. Reading env at call
  * time avoids both traps.
  *
- * ─── Groq overrides (highest priority first) ─────────────────────────────────
+ * ─── Build pipeline (extract + merge) provider order ─────────────────────────
+ *
+ *   1. Modal-hosted Qwen3.6-27B (llama.cpp, OpenAI-compatible)  — preferred
+ *      when MODAL_LLAMA_URL + MODAL_LLAMA_API_KEY are set.
+ *   2. Groq primary (gpt-oss-120b)
+ *   3. Groq fallback (llama-4-scout)
+ *
+ * The orchestrator walks this list on transient/rate-limit/parse failures
+ * (see isFallbackableError below). Chat streaming has its own resolver
+ * (`chatModel`) — unchanged.
+ *
+ * ─── Groq overrides (highest priority first, within Groq tier) ───────────────
  *
  *   1. GROQ_EXTRACT_MODELS / GROQ_MERGE_MODELS  (per-stage list)
  *   2. GROQ_EXTRACT_MODEL  / GROQ_MERGE_MODEL   (per-stage single)
  *   3. GROQ_MODELS                              (master list)
- *   4. baked-in default                         (llama-3.3-70b + llama-3.1-8b)
+ *   4. baked-in default                         (gpt-oss-120b + llama-4-scout)
  *
- * Lists are comma-separated. The pipeline tries each model in order; if a
- * call fails with a transient/rate-limit error, the next model is tried.
+ * Lists are comma-separated.
  *
- *   GROQ_MODELS=llama-3.3-70b-versatile,llama-3.1-8b-instant
+ *   GROQ_MODELS=openai/gpt-oss-120b,meta-llama/llama-4-scout-17b-16e-instruct
  */
+
+import type { LanguageModel } from "ai";
+import { createGroq } from "@ai-sdk/groq";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 // Models verified to support Groq's `response_format: json_schema` mode (which
 // the AI SDK `generateObject` uses). Llama 3.x and Qwen3 on Groq currently
@@ -30,6 +44,9 @@ const GROQ_EXTRACT_DEFAULTS = [
 ];
 // Chat streaming uses plain JSON-free text, so any Groq chat model works.
 const GROQ_CHAT_DEFAULT = "llama-3.3-70b-versatile";
+
+// Default Modal model name; overridable via MODAL_LLAMA_MODEL.
+const MODAL_DEFAULT_MODEL = "qwen3.6-27b";
 
 function parseList(value: string | undefined): string[] {
   if (!value) return [];
@@ -45,10 +62,7 @@ function groqMasterList(): string[] {
   return GROQ_EXTRACT_DEFAULTS;
 }
 
-// Per-chunk style extraction (offline, quality-sensitive). Returns an
-// ordered fallback list — first entry is preferred, later entries are
-// tried only if earlier ones return transient/rate-limit errors.
-export function extractModels(): string[] {
+function groqExtractList(): string[] {
   const list = parseList(process.env.GROQ_EXTRACT_MODELS);
   if (list.length > 0) return list;
   const single = process.env.GROQ_EXTRACT_MODEL;
@@ -56,9 +70,7 @@ export function extractModels(): string[] {
   return groqMasterList();
 }
 
-// Reduce N chunk extractions to one consolidated persona. Same fallback
-// semantics as extractModels.
-export function mergeModels(): string[] {
+function groqMergeList(): string[] {
   const list = parseList(process.env.GROQ_MERGE_MODELS);
   if (list.length > 0) return list;
   const single = process.env.GROQ_MERGE_MODEL;
@@ -66,8 +78,152 @@ export function mergeModels(): string[] {
   return groqMasterList();
 }
 
+// ─── Provider factories ───────────────────────────────────────────────────────
+
+/**
+ * Build a LanguageModel for the Modal-hosted Qwen llama.cpp server.
+ * Returns null if Modal env vars aren't set (so the resolver can skip the
+ * Modal tier and fall straight to Groq).
+ *
+ * Notes:
+ *   • Reads env at call time, not at import, so dev "Reload env" and CLI
+ *     scripts that call process.loadEnvFile() post-import see fresh values.
+ *   • `supportsStructuredOutputs: false` (default) makes the AI SDK send
+ *     `response_format: { type: "json_object" }` and inline the schema in the
+ *     prompt rather than `response_format: json_schema` — llama.cpp's OpenAI
+ *     shim doesn't reliably honour arbitrary json_schema. The fallback walk
+ *     catches Zod parse failures and falls back to Groq, which does honour
+ *     json_schema natively.
+ */
+export function modalLanguageModel(): LanguageModel | null {
+  const baseURL = process.env.MODAL_LLAMA_URL?.trim();
+  const apiKey = process.env.MODAL_LLAMA_API_KEY?.trim();
+  if (!baseURL || !apiKey) return null;
+  const modelId = (process.env.MODAL_LLAMA_MODEL?.trim() || MODAL_DEFAULT_MODEL);
+  // Strip a trailing slash on baseURL so we always emit `${base}/v1/...`.
+  const trimmed = baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL;
+  const provider = createOpenAICompatible({
+    name: "modal",
+    baseURL: `${trimmed}/v1`,
+    apiKey,
+  });
+  return provider.chatModel(modelId);
+}
+
+/** Build a Groq LanguageModel for the given model id. Throws if no key set. */
+export function groqLanguageModel(modelId: string): LanguageModel {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GROQ_API_KEY is not set. Add it to .env.local (see .env.example).",
+    );
+  }
+  const groq = createGroq({ apiKey });
+  return groq(modelId);
+}
+
+// ─── Entry-based resolvers for the build pipeline ─────────────────────────────
+
+/**
+ * One step in the build-pipeline fallback list. The orchestrator iterates
+ * these in order, calling `getLanguageModel()` lazily so a missing Modal
+ * config doesn't crash the resolver — Modal entries are simply skipped at
+ * list-build time when env isn't set.
+ *
+ * `provider` is consumed by the extractor/merger to distinguish Modal-vs-Groq
+ * success (Modal success triggers `recordModalActivity()` for GPU warm-state
+ * tracking; Groq success does not).
+ *
+ * `modelId` is the value written into `meta.builtBy.model` and surfaced in
+ * structured logs. For Modal entries it carries a `modal/` prefix so the
+ * provenance is visible in cached personas without consulting `provider`.
+ */
+export type LlmModelEntry = {
+  provider: "modal" | "groq";
+  modelId: string;
+  getLanguageModel: () => LanguageModel;
+};
+
+const MODAL_ID_PREFIX = "modal/";
+
+/** True if a string id looks like one produced by a Modal entry. */
+export function isModalModelId(id: string): boolean {
+  return id.startsWith(MODAL_ID_PREFIX);
+}
+
+function modalEntry(): LlmModelEntry | null {
+  // Cheap env probe first to avoid throwing later. The actual LanguageModel
+  // is materialised lazily inside getLanguageModel() so each retry within
+  // the fallback walk gets a fresh instance (matching how the prior Groq
+  // path created a fresh createGroq() per call).
+  if (!process.env.MODAL_LLAMA_URL?.trim()) return null;
+  if (!process.env.MODAL_LLAMA_API_KEY?.trim()) return null;
+  const modelId = (process.env.MODAL_LLAMA_MODEL?.trim() || MODAL_DEFAULT_MODEL);
+  return {
+    provider: "modal",
+    modelId: `${MODAL_ID_PREFIX}${modelId}`,
+    getLanguageModel: () => {
+      const m = modalLanguageModel();
+      if (m === null) {
+        // Env disappeared between probe and call — surface a clean error
+        // that the fallback walk will treat as non-fallbackable so we bail
+        // out instead of silently looping. Shouldn't happen in practice.
+        throw new Error("Modal env vars unset at call time.");
+      }
+      return m;
+    },
+  };
+}
+
+function groqEntries(ids: string[]): LlmModelEntry[] {
+  return ids.map((modelId) => ({
+    provider: "groq" as const,
+    modelId,
+    getLanguageModel: () => groqLanguageModel(modelId),
+  }));
+}
+
+/**
+ * Per-chunk style extraction fallback list. Ordered: Modal first (when
+ * configured), then the Groq fallback list.
+ */
+export function extractModelEntries(): LlmModelEntry[] {
+  const entries: LlmModelEntry[] = [];
+  const m = modalEntry();
+  if (m !== null) entries.push(m);
+  entries.push(...groqEntries(groqExtractList()));
+  return entries;
+}
+
+/**
+ * Merge-stage fallback list. Same Modal-first ordering as extract.
+ */
+export function mergeModelEntries(): LlmModelEntry[] {
+  const entries: LlmModelEntry[] = [];
+  const m = modalEntry();
+  if (m !== null) entries.push(m);
+  entries.push(...groqEntries(groqMergeList()));
+  return entries;
+}
+
+/**
+ * Back-compat string-only view of extract fallback list. Returns model ids
+ * in the same order as `extractModelEntries()`. Modal entries carry the
+ * `modal/` prefix.
+ */
+export function extractModels(): string[] {
+  return extractModelEntries().map((e) => e.modelId);
+}
+
+/**
+ * Back-compat string-only view of merge fallback list.
+ */
+export function mergeModels(): string[] {
+  return mergeModelEntries().map((e) => e.modelId);
+}
+
 // Realtime chat with the persona (latency-sensitive). Single model only —
-// streaming chat can't transparently fail over mid-response.
+// streaming chat can't transparently fail over mid-response. Groq-only.
 export function chatModel(): string {
   return process.env.GROQ_CHAT_MODEL ?? GROQ_CHAT_DEFAULT;
 }

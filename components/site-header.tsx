@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Landmark } from "lucide-react";
 
+import { GpuStatusDot } from "@/components/gpu-status-dot";
 import { HeaderSearch } from "@/components/header-search";
 
 // Top-of-page chrome: brand mark on the left, search in the middle, persona
@@ -30,6 +31,9 @@ export function SiteHeader() {
         <nav className="hidden text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-muted-foreground lg:block">
           Hansard-grounded · AI personas
         </nav>
+        <div className="ml-1 flex shrink-0 items-center">
+          <GpuStatusDot />
+        </div>
       </div>
     </header>
   );

@@ -1,9 +1,15 @@
 import { z } from "zod";
 import { generateObject } from "ai";
-import { createGroq } from "@ai-sdk/groq";
 import { MERGE_SYSTEM, buildMergePrompt } from "./prompts/merge";
 import type { Extraction } from "./extractor";
-import { mergeModels, isFallbackableError, summariseError } from "./models";
+import {
+  mergeModelEntries,
+  groqLanguageModel,
+  isFallbackableError,
+  summariseError,
+  type LlmModelEntry,
+} from "./models";
+import { recordModalActivity } from "@/lib/warmup-state";
 
 // ─── Schema for the consolidated persona ──────────────────────────────────────
 
@@ -51,7 +57,11 @@ export type MergedPersona = z.infer<typeof MergedPersonaSchema>;
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export type MergeOptions = {
-  /** Override the Groq model id list. Default: lib/models#mergeModels(). */
+  /**
+   * Override the model id list (Groq-only). Default: lib/models#mergeModelEntries(),
+   * which prepends the Modal provider when configured. Passing this option
+   * bypasses Modal — kept for back-compat with scripts/tests.
+   */
   models?: string[];
   temperature?: number;
   /**
@@ -76,16 +86,14 @@ function composeSignals(signals: (AbortSignal | undefined)[]): AbortSignal {
 }
 
 async function callOnce(
-  apiKey: string,
-  modelId: string,
+  entry: LlmModelEntry,
   name: string,
   extractions: Extraction[],
   temperature: number,
   signal: AbortSignal,
 ): Promise<MergedPersona> {
-  const groq = createGroq({ apiKey });
   const { object } = await generateObject({
-    model: groq(modelId),
+    model: entry.getLanguageModel(),
     schema: MergedPersonaSchema,
     system: MERGE_SYSTEM,
     prompt: buildMergePrompt(name, extractions),
@@ -112,17 +120,20 @@ export async function mergeExtractions(
   extractions: Extraction[],
   opts: MergeOptions = {},
 ): Promise<{ persona: MergedPersona; model: string }> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "GROQ_API_KEY is not set. Add it to .env.local (see .env.example).",
-    );
-  }
   if (extractions.length === 0) {
     throw new Error("Cannot merge zero extractions.");
   }
 
-  const pool = opts.models && opts.models.length > 0 ? opts.models : mergeModels();
+  // Caller-provided id list is Groq-only (back-compat). Default path uses
+  // `mergeModelEntries()` which prepends Modal when configured.
+  const pool: LlmModelEntry[] =
+    opts.models && opts.models.length > 0
+      ? opts.models.map((modelId) => ({
+          provider: "groq" as const,
+          modelId,
+          getLanguageModel: () => groqLanguageModel(modelId),
+        }))
+      : mergeModelEntries();
   if (pool.length === 0) {
     throw new Error("Merge model pool is empty.");
   }
@@ -133,15 +144,15 @@ export async function mergeExtractions(
 
   let lastError: unknown;
   for (let i = 0; i < ordered.length; i++) {
-    const modelId = ordered[i];
+    const entry = ordered[i];
+    const modelId = entry.modelId;
     const timeoutSignal = AbortSignal.timeout(perCallTimeoutMs);
     const signal = composeSignals([opts.signal, timeoutSignal]);
 
     const attemptStart = Date.now();
     try {
       const persona = await callOnce(
-        apiKey,
-        modelId,
+        entry,
         name,
         extractions,
         temperature,
@@ -150,7 +161,13 @@ export async function mergeExtractions(
       console.log(`[merge] model succeeded: ${modelId}`, {
         attempt: i + 1,
         elapsedMs: Date.now() - attemptStart,
+        provider: entry.provider,
       });
+      // Modal succeeded — fire-and-forget activity ping (see extractor for
+      // rationale). Never await; swallow rejections.
+      if (entry.provider === "modal") {
+        void recordModalActivity().catch(() => {});
+      }
       return { persona, model: modelId };
     } catch (err) {
       lastError = err;
@@ -165,6 +182,7 @@ export async function mergeExtractions(
         attempt: i + 1,
         total: ordered.length,
         elapsedMs: Date.now() - attemptStart,
+        provider: entry.provider,
         ...summariseError(err),
       });
       if (!isFallbackableError(err)) throw err;

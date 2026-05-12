@@ -1,8 +1,14 @@
 import { z } from "zod";
 import { generateObject } from "ai";
-import { createGroq } from "@ai-sdk/groq";
 import { EXTRACT_SYSTEM, buildExtractPrompt } from "./prompts/extract";
-import { extractModels, isFallbackableError, summariseError } from "./models";
+import {
+  extractModelEntries,
+  groqLanguageModel,
+  isFallbackableError,
+  summariseError,
+  type LlmModelEntry,
+} from "./models";
+import { recordModalActivity } from "@/lib/warmup-state";
 
 // ─── Output schemas ───────────────────────────────────────────────────────────
 //
@@ -105,7 +111,12 @@ export type FullCorpusPersona = z.infer<typeof FullCorpusPersonaSchema>;
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export type ExtractOptions = {
-  /** Override the Groq model id list. Default: lib/models#extractModels(). */
+  /**
+   * Override the model id list (Groq-only). Default: lib/models#extractModelEntries(),
+   * which prepends the Modal provider when configured. Passing this option
+   * bypasses Modal and uses Groq for every entry — kept for test scripts and
+   * back-compat.
+   */
   models?: string[];
   /** Sampling temperature. Default 0.2 — extraction wants determinism. */
   temperature?: number;
@@ -155,8 +166,7 @@ function composeSignals(signals: (AbortSignal | undefined)[]): AbortSignal {
 }
 
 async function callOnce<S extends z.ZodTypeAny>(
-  apiKey: string,
-  modelId: string,
+  entry: LlmModelEntry,
   schema: S,
   personName: string,
   text: string,
@@ -164,13 +174,12 @@ async function callOnce<S extends z.ZodTypeAny>(
   maxOutputTokens: number,
   signal: AbortSignal,
 ): Promise<z.infer<S>> {
-  const groq = createGroq({ apiKey });
   const { object } = await generateObject({
     // The Zod schema's runtime shape and the AI SDK's generic inference
     // don't unify cleanly across `S extends z.ZodTypeAny` callers. Both
     // branches feed identical schema shapes (object schemas with array +
     // string fields), so the runtime contract holds.
-    model: groq(modelId),
+    model: entry.getLanguageModel(),
     schema: schema as z.ZodSchema<z.infer<S>>,
     system: EXTRACT_SYSTEM,
     prompt: buildExtractPrompt(personName, text),
@@ -193,14 +202,23 @@ async function callOnce<S extends z.ZodTypeAny>(
  * caller can record provenance in `meta.builtBy`.
  */
 async function runWithFallback<S extends z.ZodTypeAny>(
-  apiKey: string,
   schema: S,
   personName: string,
   text: string,
   maxOutputTokens: number,
   opts: ExtractOptions,
 ): Promise<{ result: z.infer<S>; model: string }> {
-  const pool = opts.models && opts.models.length > 0 ? opts.models : extractModels();
+  // Caller-provided id list is treated as Groq-only (back-compat for scripts
+  // and tests). The default path uses `extractModelEntries()` which prepends
+  // Modal when configured.
+  const pool: LlmModelEntry[] =
+    opts.models && opts.models.length > 0
+      ? opts.models.map((modelId) => ({
+          provider: "groq" as const,
+          modelId,
+          getLanguageModel: () => groqLanguageModel(modelId),
+        }))
+      : extractModelEntries();
   if (pool.length === 0) {
     throw new Error("Model pool is empty.");
   }
@@ -211,7 +229,8 @@ async function runWithFallback<S extends z.ZodTypeAny>(
 
   let lastError: unknown;
   for (let i = 0; i < ordered.length; i++) {
-    const modelId = ordered[i];
+    const entry = ordered[i];
+    const modelId = entry.modelId;
     opts.onAttempt?.({ kind: "start", model: modelId, index: i, total: ordered.length });
 
     // Compose caller's signal with a fresh per-call timeout.
@@ -221,8 +240,7 @@ async function runWithFallback<S extends z.ZodTypeAny>(
     const attemptStart = Date.now();
     try {
       const result = await callOnce(
-        apiKey,
-        modelId,
+        entry,
         schema,
         personName,
         text,
@@ -233,7 +251,15 @@ async function runWithFallback<S extends z.ZodTypeAny>(
       console.log(`[extract] model succeeded: ${modelId}`, {
         attempt: i + 1,
         elapsedMs: Date.now() - attemptStart,
+        provider: entry.provider,
       });
+      // Modal succeeded — fire-and-forget warmup-state ping so the warmup
+      // tracker can keep the GPU alive on the back of natural traffic.
+      // Never await; swallow rejections so a tracker hiccup can't fail the
+      // build.
+      if (entry.provider === "modal") {
+        void recordModalActivity().catch(() => {});
+      }
       opts.onAttempt?.({ kind: "success", model: modelId, index: i, total: ordered.length });
       return { result, model: modelId };
     } catch (err) {
@@ -259,6 +285,7 @@ async function runWithFallback<S extends z.ZodTypeAny>(
         attempt: i + 1,
         total: ordered.length,
         elapsedMs: Date.now() - attemptStart,
+        provider: entry.provider,
         ...summariseError(err),
       });
       opts.onAttempt?.({
@@ -292,14 +319,7 @@ export async function extractStyleFromChunk(
   chunkText: string,
   opts: ExtractOptions = {},
 ): Promise<Extraction> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "GROQ_API_KEY is not set. Add it to .env.local (see .env.example).",
-    );
-  }
   const { result } = await runWithFallback(
-    apiKey,
     ExtractionSchema,
     personName,
     chunkText,
@@ -321,14 +341,7 @@ export async function extractFullCorpusPersona(
   text: string,
   opts: ExtractOptions = {},
 ): Promise<{ persona: FullCorpusPersona; model: string }> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "GROQ_API_KEY is not set. Add it to .env.local (see .env.example).",
-    );
-  }
   const { result, model } = await runWithFallback(
-    apiKey,
     FullCorpusPersonaSchema,
     personName,
     text,
