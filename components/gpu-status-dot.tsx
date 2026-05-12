@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 // ─── Contract with /api/warmup/status ─────────────────────────────────────────
@@ -105,7 +105,13 @@ export function GpuStatusDot() {
       }
 
       if (!mountedRef.current) return;
-      setState(next);
+      // Demote the state update to transition priority so it never preempts
+      // an in-flight navigation View Transition snapshot — a sync setState
+      // landing during the morph window will break shared-element animations
+      // (e.g. the card→profile portrait morph).
+      startTransition(() => {
+        setState(next);
+      });
 
       if (next === "warm") {
         scheduleNext(POLL_WARM_MS);
