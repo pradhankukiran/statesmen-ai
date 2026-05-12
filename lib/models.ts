@@ -88,12 +88,13 @@ function groqMergeList(): string[] {
  * Notes:
  *   • Reads env at call time, not at import, so dev "Reload env" and CLI
  *     scripts that call process.loadEnvFile() post-import see fresh values.
- *   • `supportsStructuredOutputs: false` (default) makes the AI SDK send
- *     `response_format: { type: "json_object" }` and inline the schema in the
- *     prompt rather than `response_format: json_schema` — llama.cpp's OpenAI
- *     shim doesn't reliably honour arbitrary json_schema. The fallback walk
- *     catches Zod parse failures and falls back to Groq, which does honour
- *     json_schema natively.
+ *   • `supportsStructuredOutputs: true` makes the AI SDK send
+ *     `response_format: { type: "json_schema", json_schema: { ... } }` rather
+ *     than inlining the schema in the prompt. llama.cpp's OpenAI shim compiles
+ *     the schema to a GBNF grammar and grammar-constrains generation, which
+ *     is the only reliable way to make Qwen emit Zod-parseable JSON. Without
+ *     this, prompted-JSON output regularly fails to parse on the extract
+ *     schema and the walk falls through to Groq.
  */
 export function modalLanguageModel(): LanguageModel | null {
   const baseURL = process.env.MODAL_LLAMA_URL?.trim();
@@ -107,7 +108,7 @@ export function modalLanguageModel(): LanguageModel | null {
     baseURL: `${trimmed}/v1`,
     apiKey,
   });
-  return provider.chatModel(modelId);
+  return provider.languageModel(modelId, { supportsStructuredOutputs: true });
 }
 
 /** Build a Groq LanguageModel for the given model id. Throws if no key set. */
