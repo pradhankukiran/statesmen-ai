@@ -107,8 +107,11 @@ export function modalLanguageModel(): LanguageModel | null {
     name: "modal",
     baseURL: `${trimmed}/v1`,
     apiKey,
+    // Must be set on the provider — `provider.languageModel(id, config)`
+    // looks typed-friendly but its runtime drops the config argument.
+    supportsStructuredOutputs: true,
   });
-  return provider.languageModel(modelId, { supportsStructuredOutputs: true });
+  return provider.chatModel(modelId);
 }
 
 /** Build a Groq LanguageModel for the given model id. Throws if no key set. */
