@@ -84,14 +84,14 @@ export function PersonCard({
       )}
     >
       <Card size="sm" className="h-full gap-0 py-0">
-        <ViewTransition name={`portrait-${id}`}>
-          <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
-            {src ? (
-              // Shared-element morph: the profile page (and its loading skeleton)
-              // wrap their portrait in <ViewTransition name="portrait-<id>">
-              // with the same id, so React coordinates a morph across the
-              // navigation. `id` is either a numeric Members API id or a
-              // popular-pms slug — both safe in a CSS ident.
+        <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
+          {src ? (
+            // Shared-element morph: the profile page (and its loading skeleton)
+            // wrap their portrait in <ViewTransition name="portrait-<id>">
+            // with the same id, so React coordinates a morph across the
+            // navigation. `id` is either a numeric Members API id or a
+            // popular-pms slug — both safe in a CSS ident.
+            <ViewTransition name={`portrait-${id}`}>
               <Image
                 src={src}
                 alt={`Portrait of ${name}`}
@@ -99,16 +99,16 @@ export function PersonCard({
                 sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, (min-width: 640px) 33vw, 50vw"
                 className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
               />
-            ) : (
-              <div
-                aria-hidden
-                className="flex h-full w-full items-center justify-center bg-brand text-3xl font-semibold tracking-tight text-brand-foreground sm:text-4xl"
-              >
-                {initials(name)}
-              </div>
-            )}
-          </div>
-        </ViewTransition>
+            </ViewTransition>
+          ) : (
+            <div
+              aria-hidden
+              className="flex h-full w-full items-center justify-center bg-brand text-3xl font-semibold tracking-tight text-brand-foreground sm:text-4xl"
+            >
+              {initials(name)}
+            </div>
+          )}
+        </div>
         <CardContent className="flex flex-1 flex-col gap-1.5 bg-brand py-3 text-brand-foreground transition-colors group-hover:bg-brand-hover">
           <div className="font-heading text-[0.9375rem] leading-snug font-medium">
             {name}

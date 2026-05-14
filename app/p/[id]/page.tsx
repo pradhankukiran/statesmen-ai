@@ -168,10 +168,10 @@ export default async function ProfilePage({
               // portrait. Cards keyed by a numeric Members API id surface
               // `memberId` here; attribution PMs (Thatcher etc.) come in via
               // the slug route, where `popular.slug` matches the URL `id`.
-              <ViewTransition
-                name={`portrait-${profile.memberId ?? profile.popular?.slug ?? id}`}
-              >
-                <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
+              <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
+                <ViewTransition
+                  name={`portrait-${profile.memberId ?? profile.popular?.slug ?? id}`}
+                >
                   <Image
                     src={profile.photoUrl}
                     alt={`Portrait of ${profile.name}`}
@@ -180,8 +180,8 @@ export default async function ProfilePage({
                     priority
                     className="object-cover"
                   />
-                </div>
-              </ViewTransition>
+                </ViewTransition>
+              </div>
             ) : (
               <div
                 aria-hidden

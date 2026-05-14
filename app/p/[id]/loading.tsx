@@ -1,18 +1,16 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { ViewTransition } from "react";
+
+
 
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Mirrors the profile page layout — same paddings, same grid, same chrome —
-// so there's no surprise reflow when the data lands. The portrait skeleton
-// carries the same `portrait-<id>` view-transition name as the card and the
-// real profile portrait, so the morph survives the Suspense boundary on slow
-// async loaders (modern PMs via the Members API).
+// so there's no surprise reflow when the data lands. We specifically do NOT
+// apply the view-transition-name to the skeleton, allowing the View Transitions
+// API to hold the previous page's image snapshot until the new page's image
+// is ready to be morphed into directly.
 export default function ProfileLoading() {
-  const params = useParams<{ id: string }>();
-  const id = params?.id;
 
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:py-14 lg:flex lg:h-full lg:flex-col lg:overflow-hidden lg:py-0 lg:pt-10">
@@ -29,13 +27,7 @@ export default function ProfileLoading() {
       <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pb-10">
         <section className="mt-12 grid gap-10 sm:mt-16 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:gap-12">
           <div className="max-w-sm">
-            {id ? (
-              <ViewTransition name={`portrait-${id}`}>
-                <Skeleton className="aspect-[3/4] w-full rounded-2xl" />
-              </ViewTransition>
-            ) : (
               <Skeleton className="aspect-[3/4] w-full rounded-2xl" />
-            )}
           </div>
 
           <div className="flex flex-col gap-8">
