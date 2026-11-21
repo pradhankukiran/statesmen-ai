@@ -43,7 +43,7 @@ const GROQ_EXTRACT_DEFAULTS = [
   "meta-llama/llama-4-scout-17b-16e-instruct",
 ];
 // Chat streaming uses plain JSON-free text, so any Groq chat model works.
-const GROQ_CHAT_DEFAULT = "llama-3.3-70b-versatile";
+const GROQ_CHAT_DEFAULT = "qwen/qwen3.8-27b";
 
 // Default Modal model name; overridable via MODAL_LLAMA_MODEL.
 const MODAL_DEFAULT_MODEL = "qwen3.6-27b";

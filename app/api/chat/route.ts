@@ -253,6 +253,10 @@ export async function POST(request: Request): Promise<Response> {
       // headroom against mid-paragraph truncation, with the system-prompt
       // reinforcement above carrying the brevity contract.
       maxOutputTokens: 2000,
+      // Qwen3.8 27B thinks before answering by default, and Groq's default
+      // format puts that thinking inline in <think> tags. Turn it off: faster
+      // first token, and no reasoning text leaking into the chat bubble.
+      providerOptions: { groq: { reasoningEffort: "none" } },
       // Client disconnect / route shutdown propagates into the upstream
       // Groq call so we don't keep paying for tokens nobody will read.
       abortSignal: request.signal,
