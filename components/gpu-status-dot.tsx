@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 
 // ─── Contract with /api/warmup/status ─────────────────────────────────────────
 //
-// The status endpoint reports the GPU build engine's warm-state. Cold means
-// no recent successful warmup ping; warming means a POST /api/warmup is in
-// flight (or recently kicked off); warm means the model is alive and ready.
+// The status endpoint reports the embedding service's warm-state (it runs on
+// a Modal GPU and powers both builds and chat search). Cold means no recent
+// successful call; warming means a POST /api/warmup is in flight (or recently
+// kicked off); warm means the model is alive and ready.
 
 type WarmState = "cold" | "warming" | "warm";
 
@@ -26,9 +27,9 @@ const POLL_FAST_MS = 5_000;
 // ─── Visual + a11y copy keyed by state ────────────────────────────────────────
 
 const COPY: Record<WarmState, string> = {
-  cold: "Build engine cold — first chat will be slower",
-  warming: "Warming up build engine...",
-  warm: "Build engine ready",
+  cold: "Speech search asleep — the first build or reply takes ~15s longer",
+  warming: "Waking speech search...",
+  warm: "Speech search ready",
 };
 
 const DOT_CLASSES: Record<WarmState, string> = {

@@ -8,12 +8,14 @@
  */
 
 import { groq } from "@ai-sdk/groq";
+import { after } from "next/server";
 import {
   convertToModelMessages,
   streamText,
   type UIMessage,
 } from "ai";
 import { chatModel } from "@/lib/models";
+import { recordEmbedActivity } from "@/lib/warmup-state";
 import { getPerson, searchSpeeches, type StoredPerson } from "@/lib/speeches";
 import {
   buildChatSystemPrompt,
@@ -231,6 +233,9 @@ export async function POST(request: Request): Promise<Response> {
       { status: 503 },
     );
   }
+
+  // Keeps the header status dot honest; runs after the response is sent.
+  after(recordEmbedActivity);
 
   const system = buildChatSystemPrompt(person, speeches);
   const model = groq(chatModel());

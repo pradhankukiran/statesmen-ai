@@ -40,3 +40,11 @@ CREATE TABLE IF NOT EXISTS speeches (
 -- Searches are always within one person (~500 rows), so an exact scan over
 -- that person's rows is fast and fully accurate. The primary key's leading
 -- person_slug column covers the filter; no approximate vector index needed.
+
+-- Warm/cold state of external services, for the header status dot.
+-- name = 'embed' for the Modal embedding service.
+CREATE TABLE IF NOT EXISTS service_state (
+  name                text PRIMARY KEY,
+  last_warm_at        timestamptz,
+  warming_started_at  timestamptz
+);

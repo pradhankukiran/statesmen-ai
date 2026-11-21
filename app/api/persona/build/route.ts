@@ -6,7 +6,9 @@
  * events to the build page.
  */
 
+import { after } from "next/server";
 import type { FetchConfig } from "@/lib/collect";
+import { recordEmbedActivity } from "@/lib/warmup-state";
 import {
   buildSpeechIndex,
   getPerson,
@@ -350,6 +352,8 @@ export async function POST(request: Request): Promise<Response> {
             signal: compositeSignal,
           });
 
+          // Keeps the header status dot honest; runs after the response ends.
+          after(recordEmbedActivity);
           send({ type: "ready", cached: false, speechCount: result.speechCount });
         });
       } catch (err) {
