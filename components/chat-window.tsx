@@ -61,7 +61,7 @@ const AssistantMarkdown = memo(function AssistantMarkdown({
   return (
     <div
       className={cn(
-        "prose prose-sm prose-neutral max-w-none dark:prose-invert sm:prose-base",
+        "prose prose-sm prose-neutral max-w-none sm:prose-base",
         // Brand-yellow blockquote accent — overrides the prose default
         // (muted neutral border) to keep the design system's chromatic anchor.
         "prose-blockquote:border-l-brand prose-blockquote:font-normal prose-blockquote:not-italic",
