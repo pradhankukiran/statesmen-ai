@@ -5,20 +5,19 @@ import { cn } from "@/lib/utils"
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 //
-// The canonical page-opening band: an optional brand-yellow eyebrow pill, a
-// confident headline, supporting body copy, and slot for trailing content
-// (CTAs, status accents, etc.). One component — every page that used to
-// hand-roll this rhythm now goes through here.
+// The canonical page-opening band: an optional eyebrow pill, a serif
+// headline, supporting body copy, and a slot for trailing content (CTAs,
+// status lines). Every page opens through here.
 //
-// Sizes cap deliberately: lg = text-4xl/5xl, default = text-3xl/4xl. No
-// text-7xl. Restraint is the point.
+//   lg      ─ text-display (home)
+//   default ─ text-title (everything else)
 
 type HeroSize = "default" | "lg"
 
 type HeroProps = {
-  /** Optional eyebrow text rendered as a brand-yellow pill above the headline. */
+  /** Optional eyebrow text rendered as an accent pill above the headline. */
   eyebrow?: React.ReactNode
-  /** Headline content. Use Hero.Highlight inside to apply the brand-yellow word marker. */
+  /** Headline content. Use Hero.Highlight inside to emphasise a word. */
   headline: React.ReactNode
   /** Optional supporting paragraph below the headline. */
   body?: React.ReactNode
@@ -39,22 +38,19 @@ export function Hero({
   bodyMaxWidth,
   className,
 }: HeroProps) {
-  const headlineSize =
-    size === "lg"
-      ? "text-4xl sm:text-5xl"
-      : "text-3xl sm:text-4xl"
+  const headlineSize = size === "lg" ? "text-display" : "text-title"
 
   return (
     <header className={cn("flex w-full flex-col items-start", className)}>
       {eyebrow ? (
-        <Badge variant="accent" className="mb-6">
+        <Badge variant="accent" className="mb-5">
           {eyebrow}
         </Badge>
       ) : null}
 
       <h1
         className={cn(
-          "text-balance font-semibold leading-[1.1] tracking-tight",
+          "font-heading text-balance font-medium",
           headlineSize,
         )}
       >
@@ -64,7 +60,7 @@ export function Hero({
       {body ? (
         <p
           className={cn(
-            "mt-5 text-base leading-relaxed text-muted-foreground sm:text-lg",
+            "mt-4 text-subheading text-muted-foreground",
             bodyMaxWidth ?? "max-w-2xl",
           )}
         >
@@ -77,9 +73,7 @@ export function Hero({
   )
 }
 
-// Inline span that paints a brand-yellow background behind a single emphasized
-// word in the headline. `box-decoration-clone` makes the highlight wrap
-// gracefully across line breaks.
+// Emphasised word in a headline: serif italic in the accent green.
 function HeroHighlight({
   children,
   className,
@@ -90,7 +84,7 @@ function HeroHighlight({
   return (
     <span
       className={cn(
-        "box-decoration-clone bg-brand px-2 text-brand-foreground",
+        "italic text-brand",
         className,
       )}
     >

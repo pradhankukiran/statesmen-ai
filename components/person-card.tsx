@@ -1,30 +1,29 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ViewTransition } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+
+import { PartyLabel } from "@/components/ui/party-label";
 import { getMemberPhotoUrl } from "@/lib/members";
+import { cn } from "@/lib/utils";
 
 export type PersonCardProps = {
   /**
-   * Profile-route identifier. Either:
-   *   - a numeric Members API id (modern PMs / search results), routed as
-   *     `/p/<id>` and resolved via `getMember()`; or
-   *   - a string slug (historical / popular-pms entries), routed as
-   *     `/p/<slug>` and resolved via the popular-pms registry.
+   * Profile-route identifier: a numeric Members API id (`/p/<id>`, resolved
+   * via `getMember()`) or a popular-pms slug (`/p/<slug>`).
    */
   id: number | string;
   name: string;
   party?: string | null;
   partyColor?: string | null;
   house?: string | null;
-  /** Pre-formatted term/era string e.g. "2019–2022". Wins over startedAt/endedAt. */
+  /** Pre-formatted term e.g. "2019–2022". Wins over startedAt/endedAt. */
   term?: string | null;
-  /** Optional ISO date for fallback term derivation. */
   startedAt?: string | null;
   endedAt?: string | null;
   tagline?: string | null;
   photoUrl?: string | null;
+  /** Override the link target (defaults to the profile page). */
+  href?: string;
   className?: string;
 };
 
@@ -53,6 +52,7 @@ function initials(name: string): string {
   return `${first}${last}`.toUpperCase();
 }
 
+/** Portrait card: photo, serif name, party dot, house and term, tagline. */
 export function PersonCard({
   id,
   name,
@@ -64,80 +64,55 @@ export function PersonCard({
   endedAt,
   tagline,
   photoUrl,
+  href,
   className,
 }: PersonCardProps) {
   const src =
     photoUrl ?? (typeof id === "number" ? getMemberPhotoUrl(id) : null);
-  const derivedTerm = deriveTerm(term, startedAt, endedAt);
-  const subtitleParts: string[] = [];
-  if (house) subtitleParts.push(house);
-  if (derivedTerm) subtitleParts.push(derivedTerm);
-  const subtitle = subtitleParts.join(" · ");
+  const meta = [house, deriveTerm(term, startedAt, endedAt)]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <Link
-      href={`/p/${id}`}
-      aria-label={`Open profile for ${name}`}
+      href={href ?? `/p/${id}`}
+      aria-label={`Open ${name}`}
       className={cn(
-        "group block h-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "group flex h-full flex-col overflow-hidden rounded-lg bg-card ring-1 ring-border outline-none transition-shadow hover:ring-input focus-visible:ring-2 focus-visible:ring-brand",
         className,
       )}
     >
-      <Card size="sm" className="h-full gap-0 py-0">
-        <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
-          {src ? (
-            // Shared-element morph: the profile page (and its loading skeleton)
-            // wrap their portrait in <ViewTransition name="portrait-<id>">
-            // with the same id, so React coordinates a morph across the
-            // navigation. `id` is either a numeric Members API id or a
-            // popular-pms slug — both safe in a CSS ident.
-            <ViewTransition name={`portrait-${id}`}>
-              <Image
-                src={src}
-                alt={`Portrait of ${name}`}
-                fill
-                sizes="(min-width: 1024px) 20vw, (min-width: 768px) 25vw, (min-width: 640px) 33vw, 50vw"
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-              />
-            </ViewTransition>
-          ) : (
-            <div
-              aria-hidden
-              className="flex h-full w-full items-center justify-center bg-brand text-3xl font-semibold tracking-tight text-brand-foreground sm:text-4xl"
-            >
-              {initials(name)}
-            </div>
-          )}
-        </div>
-        <CardContent className="flex flex-1 flex-col gap-1.5 bg-brand py-3 text-brand-foreground transition-colors group-hover:bg-brand-hover">
-          <div className="font-heading text-[0.9375rem] leading-snug font-medium">
-            {name}
+      <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
+        {src ? (
+          // Shared-element morph with the profile portrait (same name).
+          <ViewTransition name={`portrait-${id}`}>
+            <Image
+              src={src}
+              alt={`Portrait of ${name}`}
+              fill
+              sizes="(min-width: 1024px) 14vw, (min-width: 640px) 30vw, 45vw"
+              className="object-cover transition-transform duration-300 ease-standard group-hover:scale-[1.02]"
+            />
+          </ViewTransition>
+        ) : (
+          <div
+            aria-hidden
+            className="flex size-full items-center justify-center bg-brand-subtle font-serif text-title text-brand"
+          >
+            {initials(name)}
           </div>
-          {(party || subtitle) && (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-foreground/80">
-              {party && (
-                <span className="inline-flex items-center gap-1.5">
-                  <span
-                    aria-hidden
-                    className="inline-block size-2 rounded-full ring-1 ring-inset ring-brand-foreground/20"
-                    style={{
-                      backgroundColor: partyColor ?? "currentColor",
-                    }}
-                  />
-                  <span className="text-brand-foreground">{party}</span>
-                </span>
-              )}
-              {party && subtitle && (
-                <span aria-hidden className="text-brand-foreground/40">·</span>
-              )}
-              {subtitle && <span>{subtitle}</span>}
-            </div>
-          )}
-          {tagline && (
-            <div className="text-xs text-brand-foreground/70">{tagline}</div>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-1 p-3">
+        <div className="font-heading text-subheading font-medium">{name}</div>
+        <PartyLabel party={party ?? null} color={partyColor} />
+        {meta && <div className="text-small text-muted-foreground">{meta}</div>}
+        {tagline && (
+          <div className="mt-auto pt-1 font-serif text-small italic text-muted-foreground">
+            {tagline}
+          </div>
+        )}
+      </div>
     </Link>
   );
 }
