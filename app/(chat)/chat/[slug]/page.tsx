@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { ChatWindow } from "@/components/chat-window";
 import { getPerson } from "@/lib/speeches";
 import { getMemberPhotoUrl } from "@/lib/members";
-import { getPopularPMBySlug } from "@/lib/popular";
+import { getPopularPMBySlug, photoUrlForMember } from "@/lib/popular";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -57,7 +57,11 @@ export default async function ChatPage({
 
   const person = await getPerson(slug);
   if (person === null) {
-    // The user shouldn't reach this page without a built persona; bounce to home.
+    // Not built yet. Featured people (home cards link straight here) go to
+    // their build page; anything else goes home.
+    const pm = getPopularPMBySlug(slug);
+    if (pm?.kind === "memberId") redirect(`/build/${slug}?id=${pm.id}`);
+    if (pm?.kind === "attribution") redirect(`/build/${slug}`);
     redirect("/");
   }
 
@@ -74,7 +78,11 @@ export default async function ChatPage({
         ? popular.photoMemberId
         : null;
   const photoUrl =
-    photoMemberId !== null ? getMemberPhotoUrl(photoMemberId) : undefined;
+    person.memberId !== null
+      ? photoUrlForMember(person.memberId)
+      : photoMemberId !== null
+        ? getMemberPhotoUrl(photoMemberId)
+        : undefined;
 
   return (
     <ChatWindow

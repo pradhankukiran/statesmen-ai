@@ -18,6 +18,7 @@
  */
 import rawData from "@/data/popular-pms.json";
 import { getMemberPhotoUrl } from "@/lib/members";
+import { displayName } from "@/lib/names";
 
 // ─── Common display fields ───────────────────────────────────────────────────
 
@@ -29,6 +30,8 @@ type CommonFields = {
   house: "Commons" | "Lords";
   term: string;
   tagline: string;
+  /** Attribution for a non-Parliament portrait (shown in the site footer). */
+  photoCredit?: string;
 };
 
 // ─── Attribution shape (mirrors lib/collect.ts FetchConfig "attribution") ────
@@ -100,7 +103,13 @@ function narrow(entry: unknown): PopularPM {
     );
   }
 
-  const common: CommonFields = { slug, name, party, partyColor, house, term, tagline };
+  const photoCredit =
+    typeof e.photoCredit === "string" && e.photoCredit.length > 0
+      ? e.photoCredit
+      : undefined;
+  const common: CommonFields = {
+    slug, name, party, partyColor, house, term, tagline, photoCredit,
+  };
 
   // memberId-shaped entry (modern PMs).
   if (typeof e.id === "number" && Number.isInteger(e.id) && e.id > 0) {
@@ -175,6 +184,10 @@ const POPULAR: readonly PopularPM[] = (rawData as unknown[]).map(narrow);
 
 const BY_SLUG: Map<string, PopularPM> = new Map(POPULAR.map((p) => [p.slug, p]));
 
+const BY_MEMBER_ID: Map<number, PopularPM> = new Map(
+  POPULAR.flatMap((p) => (p.kind === "memberId" ? [[p.id, p] as const] : [])),
+);
+
 // ─── Public accessors ────────────────────────────────────────────────────────
 
 export function getPopularPMs(): readonly PopularPM[] {
@@ -183,6 +196,29 @@ export function getPopularPMs(): readonly PopularPM[] {
 
 export function getPopularPMBySlug(slug: string): PopularPM | undefined {
   return BY_SLUG.get(slug);
+}
+
+export function getPopularPMByMemberId(id: number): PopularPM | undefined {
+  return BY_MEMBER_ID.get(id);
+}
+
+/** Featured name if this member is featured, else the cleaned API name. */
+export function displayNameForMember(id: number, rawName: string): string {
+  return BY_MEMBER_ID.get(id)?.name ?? displayName(rawName);
+}
+
+/**
+ * Portrait URL for a member: the featured entry's photo when there is one
+ * (some Parliament portraits are blank placeholders), else Parliament's.
+ */
+export function photoUrlForMember(id: number): string {
+  const pm = BY_MEMBER_ID.get(id);
+  return pm?.kind === "memberId" ? pm.photoUrl : getMemberPhotoUrl(id);
+}
+
+/** Credits for featured portraits that need attribution. */
+export function photoCredits(): string[] {
+  return POPULAR.flatMap((p) => (p.photoCredit ? [p.photoCredit] : []));
 }
 
 /**

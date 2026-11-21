@@ -63,7 +63,8 @@
     "house": "Commons",
     "term": "2007–2010",
     "tagline": "Crisis-era PM",
-    "photoUrl": "https://members-api.parliament.uk/api/Members/591/Thumbnail"
+    "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Gordon_Brown_%282008%29.jpg/500px-Gordon_Brown_%282008%29.jpg",
+    "photoCredit": "Gordon Brown: UK National Archives, Open Government Licence v3.0, via Wikimedia Commons"
   },
   {
     "slug": "tony-blair",
@@ -74,6 +75,7 @@
     "house": "Commons",
     "term": "1997–2007",
     "tagline": "New Labour PM",
-    "photoUrl": "https://members-api.parliament.uk/api/Members/512/Thumbnail"
+    "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/Tony_Blair_%282010%29.jpg/500px-Tony_Blair_%282010%29.jpg",
+    "photoCredit": "Tony Blair: Pavel Golovkin, CC BY 4.0, via Wikimedia Commons"
   }
 ]

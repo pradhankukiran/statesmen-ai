@@ -4,9 +4,16 @@ import { ViewTransition } from "react";
 import type { Metadata } from "next";
 
 import { ChatCta } from "@/components/chat-cta";
-import { Hero } from "@/components/hero";
+import { Badge } from "@/components/ui/badge";
+import { PartyLabel } from "@/components/ui/party-label";
 import { getMember, getMemberPhotoUrl, type Member } from "@/lib/members";
-import { getPopularPMBySlug, type PopularPM } from "@/lib/popular";
+import {
+  displayNameForMember,
+  getPopularPMByMemberId,
+  getPopularPMBySlug,
+  photoUrlForMember,
+  type PopularPM,
+} from "@/lib/popular";
 import { slugify } from "@/lib/slug";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -63,17 +70,21 @@ async function loadProfile(rawId: string): Promise<ProfileData> {
     } catch {
       notFound();
     }
+    const popular = getPopularPMByMemberId(member.id) ?? null;
+    const name = displayNameForMember(member.id, member.name);
     return {
-      slug: slugify(member.name),
-      name: member.name,
+      // Featured people keep their featured slug; the build and chat routes
+      // also match on member ID, so either slug finds the same persona.
+      slug: popular?.slug ?? slugify(name),
+      name,
       fullTitle: member.fullTitle,
       party: member.party,
       partyColor: member.partyColor,
       house: member.house,
       term: formatTerm(member),
-      photoUrl: member.photoUrl,
+      photoUrl: photoUrlForMember(member.id),
       memberId: member.id,
-      popular: null,
+      popular,
     };
   }
 
@@ -128,95 +139,67 @@ export default async function ProfilePage({
   const { id } = await params;
   const profile = await loadProfile(id);
 
-  // Eyebrow assembly: "PARTY · TERM" if both, else whichever we have.
-  const pillBits: string[] = [];
-  if (profile.party) pillBits.push(profile.party);
-  if (profile.term) pillBits.push(profile.term);
-  if (pillBits.length === 0) pillBits.push(profile.house);
-  const eyebrow = pillBits.join(" · ");
-
-  // Sub-headline below the name.
-  const subBits: string[] = [profile.house];
-  if (profile.fullTitle && profile.fullTitle !== profile.name) {
-    subBits.push(profile.fullTitle);
-  }
+  const meta = [profile.house, profile.term].filter(Boolean).join(" · ");
+  const portraitName = `portrait-${profile.memberId ?? profile.popular?.slug ?? id}`;
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:py-14 lg:flex lg:h-full lg:flex-col lg:overflow-hidden lg:py-0 lg:pt-10">
-      <div className="lg:flex-shrink-0">
-        <Hero size="lg" eyebrow={eyebrow} headline={profile.name}>
-          <p className="-mt-3 text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-            {subBits.join(" · ")}
-          </p>
-        </Hero>
-      </div>
-
-      <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pb-10">
-        {/* Photo + info split. Single column on mobile, two columns from sm+. */}
-        <section className="mt-12 grid gap-10 sm:mt-16 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:gap-12">
-          {/* Photo — soft Card-style chrome with optional party-colour stripe. */}
-          <div className="relative max-w-sm">
-            {profile.partyColor ? (
-              <span
-                aria-hidden
-                className="absolute -left-3 top-0 block h-full w-1 rounded-full sm:-left-4 sm:w-1.5"
-                style={{ backgroundColor: profile.partyColor }}
+    <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-16 lg:h-full lg:overflow-y-auto">
+      <section className="flex flex-col gap-8 sm:flex-row sm:items-start sm:gap-10">
+        {/* Portrait. Shared-element name matches PersonCard's. */}
+        <div className="relative aspect-[4/5] w-32 shrink-0 overflow-hidden rounded-lg bg-muted ring-1 ring-border sm:w-56">
+          {profile.photoUrl ? (
+            <ViewTransition name={portraitName}>
+              <Image
+                src={profile.photoUrl}
+                alt={`Portrait of ${profile.name}`}
+                fill
+                sizes="(min-width: 640px) 224px, 128px"
+                priority
+                className="object-cover"
               />
-            ) : null}
-            {profile.photoUrl ? (
-              // Shared-element name must match what PersonCard sets on the same
-              // portrait. Cards keyed by a numeric Members API id surface
-              // `memberId` here; attribution PMs (Thatcher etc.) come in via
-              // the slug route, where `popular.slug` matches the URL `id`.
-              <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
-                <ViewTransition
-                  name={`portrait-${profile.memberId ?? profile.popular?.slug ?? id}`}
-                >
-                  <Image
-                    src={profile.photoUrl}
-                    alt={`Portrait of ${profile.name}`}
-                    fill
-                    sizes="(min-width: 768px) 33vw, 100vw"
-                    priority
-                    className="object-cover"
-                  />
-                </ViewTransition>
-              </div>
-            ) : (
-              <div
-                aria-hidden
-                className="flex aspect-[3/4] w-full items-center justify-center rounded-2xl bg-brand text-6xl font-semibold tracking-tight text-brand-foreground ring-1 ring-border sm:text-7xl"
-              >
-                {initials(profile.name)}
-              </div>
+            </ViewTransition>
+          ) : (
+            <div
+              aria-hidden
+              className="flex size-full items-center justify-center bg-brand-subtle font-serif text-title text-brand"
+            >
+              {initials(profile.name)}
+            </div>
+          )}
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            {profile.house === "Lords" && (
+              <Badge variant="lords">House of Lords</Badge>
+            )}
+            <h1 className="font-heading text-title font-medium">{profile.name}</h1>
+            <PartyLabel party={profile.party} color={profile.partyColor} />
+            {meta && <p className="text-small text-muted-foreground">{meta}</p>}
+            {profile.fullTitle && profile.fullTitle !== profile.name && (
+              <p className="text-small text-muted-foreground">{profile.fullTitle}</p>
             )}
           </div>
 
-          {/* Info column. */}
-          <div className="flex flex-col gap-8">
-            <p className="max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Profile sourced from the UK Parliament Members API. Click below to
-              chat with an AI persona built from {profile.name}&apos;s real
-              recorded speeches in Hansard.
-            </p>
+          <p className="text-body text-muted-foreground">
+            Chat with an AI persona that answers from {profile.name}&apos;s
+            real speeches in Parliament.
+          </p>
 
-            <div>
-              <ChatCta
-                slug={profile.slug}
-                name={profile.name}
-                memberId={profile.memberId}
-                hasAttribution={
-                  profile.popular?.kind === "attribution" ? true : false
-                }
-              />
-            </div>
-
-            <p className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-              AI-generated · Not actual statements by {profile.name}
-            </p>
+          <div>
+            <ChatCta
+              slug={profile.slug}
+              name={profile.name}
+              memberId={profile.memberId}
+              hasAttribution={profile.popular?.kind === "attribution"}
+            />
           </div>
-        </section>
-      </div>
+
+          <p className="text-small text-muted-foreground">
+            AI-generated. Not real statements by {profile.name}.
+          </p>
+        </div>
+      </section>
     </div>
   );
 }

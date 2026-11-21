@@ -56,6 +56,7 @@ export default function Home() {
                 term={pm.term}
                 tagline={pm.tagline}
                 photoUrl={popularPhotoUrl(pm)}
+                href={`/chat/${pm.slug}`}
               />
             </li>
           ))}

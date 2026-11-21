@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
         hostname: "members-api.parliament.uk",
         pathname: "/api/Members/**",
       },
+      {
+        // Featured portraits Parliament has no photo for (see photoCredit
+        // in data/popular-pms.json).
+        protocol: "https",
+        hostname: "upload.wikimedia.org",
+        pathname: "/wikipedia/commons/**",
+      },
     ],
   },
   experimental: {

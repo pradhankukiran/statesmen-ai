@@ -5,7 +5,7 @@ import { BuildProgress, type BuildAttribution } from "@/components/build-progres
 import { Button } from "@/components/ui/button";
 import { Hero } from "@/components/hero";
 import { getMember } from "@/lib/members";
-import { getPopularPMBySlug } from "@/lib/popular";
+import { displayNameForMember, getPopularPMBySlug } from "@/lib/popular";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -63,7 +63,7 @@ export default async function BuildPage({
     let name: string;
     try {
       const member = await getMember(memberId);
-      name = member.name;
+      name = displayNameForMember(member.id, member.name);
     } catch {
       // Server-side lookup failed; fall back to the slug. The build endpoint
       // only needs `name` for the system prompt header, so this is safe.

@@ -1,10 +1,11 @@
-// Bottom-of-page chrome: a single disclaimer paragraph under a hairline
-// border. Minimal by design — the design system reserves the brand color
-// for fills and accents, not chrome dividers.
+import { photoCredits } from "@/lib/popular";
+
+/** Disclaimer and image credits under a hairline. */
 export function SiteFooter() {
+  const credits = photoCredits();
   return (
     <footer className="border-t border-border">
-      <div className="mx-auto w-full max-w-6xl px-6 py-8 text-sm text-muted-foreground">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-6 py-6 text-small text-muted-foreground">
         <p>
           <span className="font-medium text-foreground">Statesmen AI</span>{" "}
           builds AI personas from real{" "}
@@ -19,6 +20,9 @@ export function SiteFooter() {
           speeches. Responses are AI-generated, not actual statements by those
           depicted.
         </p>
+        {credits.length > 0 && (
+          <p className="text-label">Photos: {credits.join(" · ")}.</p>
+        )}
       </div>
     </footer>
   );

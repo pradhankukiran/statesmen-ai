@@ -1,52 +1,19 @@
-"use client";
-
-
-
-
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Mirrors the profile page layout — same paddings, same grid, same chrome —
-// so there's no surprise reflow when the data lands. We specifically do NOT
-// apply the view-transition-name to the skeleton, allowing the View Transitions
-// API to hold the previous page's image snapshot until the new page's image
-// is ready to be morphed into directly.
+/** Mirrors the profile layout: portrait beside name, details and button. */
 export default function ProfileLoading() {
-
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:py-14 lg:flex lg:h-full lg:flex-col lg:overflow-hidden lg:py-0 lg:pt-10">
-      <header className="flex flex-col items-start lg:flex-shrink-0">
-        {/* Eyebrow placeholder mirrors the resting brand pill. */}
-        <span
-          aria-hidden
-          className="mb-6 inline-block h-6 w-44 rounded-md bg-brand"
-        />
-        <Skeleton className="h-10 w-3/4 rounded-md sm:h-14 sm:w-2/3" />
-        <Skeleton className="mt-4 h-3 w-56 rounded-md" />
-      </header>
-
-      <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pb-10">
-        <section className="mt-12 grid gap-10 sm:mt-16 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:gap-12">
-          <div className="max-w-sm">
-              <Skeleton className="aspect-[3/4] w-full rounded-2xl" />
-          </div>
-
-          <div className="flex flex-col gap-8">
-            <div className="flex flex-col gap-3">
-              <Skeleton className="h-5 w-full max-w-xl rounded-md" />
-              <Skeleton className="h-5 w-11/12 max-w-xl rounded-md" />
-              <Skeleton className="h-5 w-3/4 max-w-xl rounded-md" />
-            </div>
-
-            {/* CTA placeholder — matches the new primary button height (lg = 48px). */}
-            <span
-              aria-hidden
-              className="inline-block h-12 w-56 rounded-md bg-brand"
-            />
-
-            <Skeleton className="h-3 w-72 rounded-md" />
-          </div>
-        </section>
-      </div>
+    <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-16">
+      <section className="flex flex-col gap-8 sm:flex-row sm:items-start sm:gap-10">
+        <Skeleton className="aspect-[4/5] w-32 shrink-0 rounded-lg sm:w-56" />
+        <div className="flex flex-1 flex-col gap-4">
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="mt-2 h-5 w-full max-w-md" />
+          <Skeleton className="h-12 w-52" />
+        </div>
+      </section>
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getMemberPhotoUrl, type Member } from "@/lib/members";
+import { displayName } from "@/lib/names";
 
 type SearchResponseOk = { total: number; members: Member[] };
 type SearchResponseErr = { error: string };
@@ -337,6 +338,7 @@ function ResultRow({
     .filter((x): x is string => Boolean(x))
     .join(" · ");
   const photo = member.photoUrl ?? getMemberPhotoUrl(member.id);
+  const name = displayName(member.name);
 
   return (
     <li role="option" aria-selected="false">
@@ -357,14 +359,14 @@ function ResultRow({
           ) : (
             <span
               aria-hidden
-              className="flex h-full w-full items-center justify-center bg-brand text-xs font-semibold text-brand-foreground"
+              className="flex h-full w-full items-center justify-center bg-brand-subtle font-serif text-small text-brand"
             >
-              {initials(member.name)}
+              {initials(name)}
             </span>
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{member.name}</div>
+          <div className="truncate text-small font-medium">{name}</div>
           {subtitle ? (
             <div className="truncate text-xs text-muted-foreground">
               {subtitle}
