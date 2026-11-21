@@ -1,23 +1,28 @@
-import { getPersona, hasPersona, setPersona } from "@/lib/cache";
+/**
+ * Persona build endpoint (SSE).
+ *
+ * Fetches the person's Hansard speeches, embeds them on the Modal embedding
+ * service and stores them in Neon (lib/speeches.ts), streaming progress
+ * events to the build page.
+ */
+
+import type { FetchConfig } from "@/lib/persona";
 import {
-  buildPersona,
-  type BuildEvent,
-  type FetchConfig,
-  type PersonaMeta,
-} from "@/lib/persona";
+  buildSpeechIndex,
+  getPerson,
+  type SpeechBuildEvent,
+} from "@/lib/speeches";
 
 export const runtime = "nodejs";
-// Vercel Hobby plan caps Serverless Function maxDuration at 300s. With the
-// per-call 60s timeout × 5-model fallback × extract (+ optional merge)
-// stages, builds that need many fallback hops may run up against this; in
-// practice the typical cold build finishes well inside 300s.
+// Typical builds take 25-50s (fetch ~10-17s, embed ~5s plus a ~15s Modal
+// cold start, save ~8-15s). 300s is the Vercel Hobby cap and leaves room for
+// a slow Hansard API.
 export const maxDuration = 300;
 
 // Global build deadline = 90% of `maxDuration` so we keep ~30s of headroom
 // to write a clean SSE error and close the stream before Vercel forcibly
 // kills the function with an opaque 504. The deadline is propagated as an
-// AbortSignal into every LLM call so the fallback walk terminates
-// promptly once the budget is exhausted.
+// AbortSignal into the embedding calls.
 const BUILD_DEADLINE_MS = Math.floor(maxDuration * 1000 * 0.9);
 
 // ─── Request schema ───────────────────────────────────────────────────────────
@@ -48,9 +53,9 @@ const DEFAULT_MAX = 500;
 // ─── SSE event union ──────────────────────────────────────────────────────────
 
 type SseEvent =
-  | BuildEvent
+  | SpeechBuildEvent
   | { type: "ready"; cached: true }
-  | { type: "ready"; cached: false; meta: PersonaMeta }
+  | { type: "ready"; cached: false; speechCount: number }
   | { type: "error"; message: string }
   | { type: "ping" };
 
@@ -155,7 +160,7 @@ function parseRequest(body: BuildRequestBody): ParsedRequest | string {
 // ─── In-process slug-keyed lock ───────────────────────────────────────────────
 //
 // Two concurrent builds for the same slug on a warm function instance would
-// otherwise each spend the full LLM budget and race on the cache write. The
+// otherwise each fetch and embed everything and race on the database write. The
 // lock serialises them so the second call short-circuits on cache hit after
 // the first commits. (Best-effort: doesn't span instances; for full
 // cross-instance dedup, use Vercel KV with setIfNotExists. Out of scope.)
@@ -231,19 +236,16 @@ export async function POST(request: Request): Promise<Response> {
   const { slug, name, fetch: fetchConfig } = parsed;
 
   const encoder = new TextEncoder();
-  // Capture the request's abort signal so it can be threaded into every
-  // downstream LLM call and cancel in-flight work when the client
-  // disconnects.
+  // Capture the request's abort signal so it can be threaded into the
+  // embedding calls and cancel in-flight work when the client disconnects.
   const requestSignal = request.signal;
   // Separate deadline signal: fires at ~90% of maxDuration so we can write
   // a clean SSE error and close the stream before Vercel forcibly kills
   // the function. Kept distinct from `requestSignal` so the client-
   // disconnect path and the deadline path are independently observable.
   const deadlineSignal = AbortSignal.timeout(BUILD_DEADLINE_MS);
-  // Composite signal threaded into `buildPersona`. Either client
-  // disconnect or deadline-fire aborts every in-flight LLM call via the
-  // extractor/merger's `AbortSignal.any([opts.signal, perCallTimeout])`
-  // composition.
+  // Composite signal threaded into `buildSpeechIndex`. Either client
+  // disconnect or deadline-fire aborts the in-flight embedding batches.
   const compositeSignal: AbortSignal = AbortSignal.any([
     requestSignal,
     deadlineSignal,
@@ -283,7 +285,7 @@ export async function POST(request: Request): Promise<Response> {
               : "Unknown build error.";
         if (!isAbort && !isDeadline) {
           console.error(
-            `[build] persona build failed for slug=${slug}:`,
+            `[build] speech build failed for slug=${slug}:`,
             err instanceof Error ? err.stack ?? err.message : err,
           );
         }
@@ -315,7 +317,7 @@ export async function POST(request: Request): Promise<Response> {
       // concrete budget message before the function exits, rather than an
       // opaque Vercel 504. We don't close the controller here — the
       // `finally` block at the bottom of the try-catch handles cleanup
-      // after `buildPersona` rejects via the composite signal.
+      // after `buildSpeechIndex` rejects via the composite signal.
       deadlineSignal.addEventListener("abort", () => {
         console.error(`[persona] deadline reached`, {
           slug,
@@ -332,7 +334,7 @@ export async function POST(request: Request): Promise<Response> {
 
       try {
         await withSlugLock(slug, async () => {
-          if (await hasPersona(slug)) {
+          if ((await getPerson(slug)) !== null) {
             // Cheap cache hit — surface immediately and skip the pipeline.
             // (Either pre-existing or just produced by a sibling build that
             // we waited on inside withSlugLock.)
@@ -340,7 +342,7 @@ export async function POST(request: Request): Promise<Response> {
             return;
           }
 
-          const persona = await buildPersona({
+          const result = await buildSpeechIndex({
             slug,
             name,
             fetch: fetchConfig,
@@ -348,14 +350,7 @@ export async function POST(request: Request): Promise<Response> {
             signal: compositeSignal,
           });
 
-          await setPersona(persona);
-
-          // Re-read meta from the freshly written persona to ensure callers
-          // receive the same shape `status` would return.
-          const cached = await getPersona(slug);
-          const meta: PersonaMeta = cached?.meta ?? persona.meta;
-
-          send({ type: "ready", cached: false, meta });
+          send({ type: "ready", cached: false, speechCount: result.speechCount });
         });
       } catch (err) {
         // Deadline-fire already emitted its own SSE error via the

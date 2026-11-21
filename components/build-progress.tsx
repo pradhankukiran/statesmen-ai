@@ -8,17 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Hero } from "@/components/hero";
 import { cn } from "@/lib/utils";
 
-// ─── SSE event shape (mirrors lib/persona.ts BuildEvent + route additions) ────
+// ─── SSE event shape (mirrors lib/speeches.ts SpeechBuildEvent + route additions)
 
 type SseEvent =
   | { type: "fetch_start" }
   | { type: "fetch_done"; count: number }
-  | { type: "chunk_done"; chunkCount: number; totalTokens: number }
-  | { type: "extract_start"; chunkIndex: number; totalChunks: number }
-  | { type: "extract_done"; chunkIndex: number; totalChunks: number }
-  | { type: "merge_start" }
-  | { type: "merge_done" }
-  | { type: "render_done" }
+  | { type: "embed_progress"; done: number; total: number }
+  | { type: "save_start" }
+  | { type: "save_done"; count: number }
   | { type: "ready"; cached?: boolean }
   | { type: "error"; message: string }
   | { type: "ping" };
@@ -37,21 +34,6 @@ type Step = {
   /** Wall-clock duration once the step settled. */
   durationMs?: number;
 };
-
-// Rotating hints shown under the active extract step so the page doesn't
-// look frozen during the slow free-tier LLM call (60-90s per chunk).
-const EXTRACT_HINTS = [
-  "The primary model is analysing the speeches…",
-  "Extracting vocabulary and pet phrases…",
-  "Identifying rhetorical devices…",
-  "Pulling verbatim quotes from the corpus…",
-  "Analysing tone and sentence patterns…",
-  "Free-tier models take ~60–90s per call — this is normal.",
-  "If the primary model fails, fallbacks take over automatically.",
-  "Tagging recurring topics and themes…",
-  "Each model gets up to 60 seconds — if the primary stalls, we move on automatically.",
-  "Hold tight — the model is still thinking.",
-];
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -93,14 +75,13 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [steps, setSteps] = useState<Step[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [extractProgress, setExtractProgress] = useState<{
+  const [embedProgress, setEmbedProgress] = useState<{
     done: number;
     total: number;
   } | null>(null);
   // Elapsed wall-clock since the build started, ticked every second so the
-  // user always has a moving counter even during long LLM waits.
+  // user always has a moving counter during slow steps.
   const [elapsedMs, setElapsedMs] = useState<number>(0);
-  const [hintIndex, setHintIndex] = useState<number>(0);
   // Timestamp of the last received SSE event (any type, including pings).
   // Used by the stale-stream watchdog to detect silent stream death (function
   // killed, network drop, infrastructure timeout) since SSE has no built-in
@@ -174,37 +155,15 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
         case "fetch_done":
           advance("fetch", `Found ${event.count} speeches.`);
           break;
-        case "chunk_done":
-          advance(
-            "chunk",
-            `Chunked into ${event.chunkCount} pieces (${event.totalTokens.toLocaleString()} tokens).`,
-          );
-          setExtractProgress({ done: 0, total: event.chunkCount });
+        case "embed_progress":
+          advance("embed", "Indexing speeches by meaning…");
+          setEmbedProgress({ done: event.done, total: event.total });
           break;
-        case "extract_start":
-          advance(
-            "extract",
-            `Analysing chunk ${event.chunkIndex + 1}/${event.totalChunks}…`,
-          );
-          setExtractProgress((prev) => ({
-            done: prev?.done ?? 0,
-            total: event.totalChunks,
-          }));
+        case "save_start":
+          advance("save", "Saving…");
           break;
-        case "extract_done":
-          setExtractProgress((prev) => {
-            const done = (prev?.done ?? 0) + 1;
-            const total = event.totalChunks;
-            return { done, total };
-          });
-          break;
-        case "merge_start":
-          advance("merge", "Merging style across chunks…");
-          break;
-        case "merge_done":
-          advance("merge", "Merged.");
-          break;
-        case "render_done":
+        case "save_done":
+          advance("save", `Saved ${event.count} speeches.`);
           break;
         case "ready":
           advance("ready", "Done. Opening chat…");
@@ -237,7 +196,7 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
     setPhase("running");
     setErrorMessage(null);
     setSteps([]);
-    setExtractProgress(null);
+    setEmbedProgress(null);
     setElapsedMs(0);
     setBuildStartedAt(Date.now());
     // Seed the watchdog with "now" so the 45s stale-stream timer counts from
@@ -392,17 +351,6 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
     return () => clearInterval(id);
   }, [phase, lastEventAt, finalizeAll]);
 
-  const isExtracting = steps.some(
-    (s) => s.pending && s.id === "extract",
-  );
-  useEffect(() => {
-    if (!isExtracting) return;
-    const id = setInterval(() => {
-      setHintIndex((i) => (i + 1) % EXTRACT_HINTS.length);
-    }, 4500);
-    return () => clearInterval(id);
-  }, [isExtracting]);
-
   const handleRetry = useCallback(() => {
     void startBuild();
   }, [startBuild]);
@@ -415,7 +363,7 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
         <Hero
         eyebrow="Building persona"
         headline={<>Building {name}…</>}
-        body="This only happens once. Future visitors get instant chat. The primary model analyses the speeches; if it fails, fallbacks take over automatically. Typical builds finish in 30–120 seconds."
+        body="This only happens once. After that, chat is instant for everyone. We fetch their speeches from Hansard and index them by meaning. Builds usually take under a minute."
         bodyMaxWidth="max-w-none"
       >
         {phase === "running" || phase === "done" ? (
@@ -436,9 +384,9 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
               <span className="font-mono tabular-nums text-foreground">
                 {formatDuration(elapsedMs)}
               </span>
-              {elapsedMs > 540_000 ? (
-                // 9 min in. Server maxDuration is 600s (10 min), so we're
-                // close to the hard ceiling — keep the warning subtle.
+              {elapsedMs > 240_000 ? (
+                // 4 min in. Server maxDuration is 300s, so we're close to
+                // the hard ceiling — keep the warning subtle.
                 <span className="text-muted-foreground/80">
                   · approaching server timeout
                 </span>
@@ -499,44 +447,33 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
                 </span>
               ) : null}
             </div>
-            {step.pending && step.id === "extract" ? (
-              <p
-                className="ml-7 text-xs text-muted-foreground"
-                aria-live="polite"
-              >
-                {EXTRACT_HINTS[hintIndex % EXTRACT_HINTS.length]}
-              </p>
-            ) : null}
           </li>
         ))}
       </ol>
 
       {/* Progress bar — soft track, brand-yellow fill. */}
-      {extractProgress && extractProgress.total > 0 ? (
+      {embedProgress && embedProgress.total > 0 ? (
         <div className="mt-8 flex w-full flex-col gap-3">
           <div className="flex items-center justify-between text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            <span>Chunks analysed</span>
+            <span>Speeches indexed</span>
             <span className="font-mono tabular-nums text-foreground">
-              {Math.min(extractProgress.done, extractProgress.total)} /{" "}
-              {extractProgress.total}
+              {Math.min(embedProgress.done, embedProgress.total)} /{" "}
+              {embedProgress.total}
             </span>
           </div>
           <div
             className="h-2 w-full overflow-hidden rounded-full bg-muted"
             role="progressbar"
             aria-valuemin={0}
-            aria-valuemax={extractProgress.total}
-            aria-valuenow={Math.min(
-              extractProgress.done,
-              extractProgress.total,
-            )}
+            aria-valuemax={embedProgress.total}
+            aria-valuenow={Math.min(embedProgress.done, embedProgress.total)}
           >
             <div
               className="h-full rounded-full bg-brand transition-[width] duration-300"
               style={{
                 width: `${
-                  (Math.min(extractProgress.done, extractProgress.total) /
-                    extractProgress.total) *
+                  (Math.min(embedProgress.done, embedProgress.total) /
+                    embedProgress.total) *
                   100
                 }%`,
               }}

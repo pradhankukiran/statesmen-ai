@@ -23,6 +23,7 @@ export type SpeechBuildEvent =
   | { type: "fetch_start" }
   | { type: "fetch_done"; count: number }
   | { type: "embed_progress"; done: number; total: number }
+  | { type: "save_start" }
   | { type: "save_done"; count: number };
 
 export type SpeechBuildResult = {
@@ -89,6 +90,7 @@ export async function buildSpeechIndex(opts: {
   });
   const t2 = Date.now();
 
+  emit({ type: "save_start" });
   await saveSpeeches({ ...opts, endedAt: await endedAtPromise }, speeches, embeddings);
   emit({ type: "save_done", count: speeches.length });
   const t3 = Date.now();
