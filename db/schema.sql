@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS persons (
   built_at      timestamptz NOT NULL DEFAULT now()
 );
 
+-- End of the person's time in Parliament; NULL while still serving. Sets the
+-- persona's knowledge cutoff in chat.
+ALTER TABLE persons ADD COLUMN IF NOT EXISTS ended_at date;
+
 -- One row per Hansard contribution kept for a persona.
 CREATE TABLE IF NOT EXISTS speeches (
   person_slug            text NOT NULL REFERENCES persons (slug) ON DELETE CASCADE,

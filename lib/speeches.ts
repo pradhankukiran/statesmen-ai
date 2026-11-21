@@ -12,6 +12,7 @@ import type { Contribution } from "./hansard";
 import { collectContributions, type FetchConfig } from "./persona";
 import { EMBED_MODEL, embedDocuments, embedQuery } from "./embed";
 import { toVectorLiteral, withDb, withTransaction } from "./db";
+import { getCareerDates } from "./members";
 
 /** Same floor as the old persona build: below this a persona isn't faithful. */
 const MIN_SPEECHES = 20;
@@ -37,6 +38,28 @@ function embeddingText(c: Contribution): string {
   return c.debateSection ? `${c.debateSection}\n\n${c.text}` : c.text;
 }
 
+/**
+ * When the person's time in Parliament ended, as YYYY-MM-DD, or null if they
+ * are still serving. Historical (attribution) personas end at their tenure's
+ * end date. A Members API failure leaves it null rather than failing the build.
+ */
+async function resolveEndedAt(fetch: FetchConfig): Promise<string | null> {
+  if (fetch.kind === "attribution") return fetch.endDate.slice(0, 10);
+  try {
+    const { memberships } = await getCareerDates(fetch.memberId);
+    if (memberships.length === 0 || memberships.some((m) => m.endDate === null)) {
+      return null;
+    }
+    return memberships.map((m) => m.endDate as string).sort().at(-1) ?? null;
+  } catch (err) {
+    console.warn(
+      `[speeches] career lookup failed for memberId=${fetch.memberId}:`,
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
+}
+
 export async function buildSpeechIndex(opts: {
   slug: string;
   name: string;
@@ -48,6 +71,7 @@ export async function buildSpeechIndex(opts: {
   const t0 = Date.now();
 
   emit({ type: "fetch_start" });
+  const endedAtPromise = resolveEndedAt(opts.fetch);
   const speeches = await collectContributions(opts.fetch);
   emit({ type: "fetch_done", count: speeches.length });
   const t1 = Date.now();
@@ -65,7 +89,7 @@ export async function buildSpeechIndex(opts: {
   });
   const t2 = Date.now();
 
-  await saveSpeeches(opts, speeches, embeddings);
+  await saveSpeeches({ ...opts, endedAt: await endedAtPromise }, speeches, embeddings);
   emit({ type: "save_done", count: speeches.length });
   const t3 = Date.now();
 
@@ -77,20 +101,22 @@ export async function buildSpeechIndex(opts: {
 
 /** Replace a person's stored speeches in one transaction. */
 async function saveSpeeches(
-  person: { slug: string; name: string; fetch: FetchConfig },
+  person: { slug: string; name: string; fetch: FetchConfig; endedAt: string | null },
   speeches: Contribution[],
   embeddings: number[][],
 ): Promise<void> {
   await withTransaction(async (db) => {
     await db.query(
-      `INSERT INTO persons (slug, name, member_id, source, speech_count, embed_model, built_at)
-       VALUES ($1, $2, $3, $4, $5, $6, now())
+      `INSERT INTO persons
+         (slug, name, member_id, source, speech_count, embed_model, ended_at, built_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, now())
        ON CONFLICT (slug) DO UPDATE SET
          name = EXCLUDED.name,
          member_id = EXCLUDED.member_id,
          source = EXCLUDED.source,
          speech_count = EXCLUDED.speech_count,
          embed_model = EXCLUDED.embed_model,
+         ended_at = EXCLUDED.ended_at,
          built_at = EXCLUDED.built_at`,
       [
         person.slug,
@@ -99,6 +125,7 @@ async function saveSpeeches(
         JSON.stringify(person.fetch),
         speeches.length,
         EMBED_MODEL,
+        person.endedAt,
       ],
     );
     await db.query("DELETE FROM speeches WHERE person_slug = $1", [person.slug]);
@@ -128,6 +155,38 @@ async function saveSpeeches(
         params,
       );
     }
+  });
+}
+
+export type StoredPerson = {
+  slug: string;
+  name: string;
+  memberId: number | null;
+  /** YYYY-MM-DD, or null while still serving. */
+  endedAt: string | null;
+  speechCount: number;
+  builtAt: string;
+};
+
+/** A built person, or null if they have no speech index yet. */
+export async function getPerson(slug: string): Promise<StoredPerson | null> {
+  return withDb(async (db) => {
+    const { rows } = await db.query(
+      `SELECT slug, name, member_id, ended_at::text AS ended_at, speech_count,
+              built_at::text AS built_at
+         FROM persons WHERE slug = $1`,
+      [slug],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      slug: r.slug,
+      name: r.name,
+      memberId: r.member_id,
+      endedAt: r.ended_at,
+      speechCount: r.speech_count,
+      builtAt: r.built_at,
+    };
   });
 }
 
