@@ -37,6 +37,20 @@ const SingleMemberResponseSchema = z.object({
   value: MemberValueSchema,
 });
 
+/** Shape shared by house memberships and government posts. */
+const GovernmentPostSchema = z.object({
+  name: z.string(),
+  startDate: z.string().nullish(),
+  endDate: z.string().nullish(),
+});
+
+const BiographyResponseSchema = z.object({
+  value: z.object({
+    houseMemberships: z.array(GovernmentPostSchema).nullish(),
+    governmentPosts: z.array(GovernmentPostSchema).nullish(),
+  }),
+});
+
 // ─── Public types (slim, app-friendly) ────────────────────────────────────────
 
 export type House = "Commons" | "Lords";
@@ -126,4 +140,53 @@ export async function getMember(id: number): Promise<Member> {
   }
   const parsed = SingleMemberResponseSchema.parse(await res.json());
   return toMember(parsed.value);
+}
+
+export type DateRange = {
+  startDate: string; // YYYY-MM-DD
+  endDate: string | null; // YYYY-MM-DD, null while still serving
+};
+
+export type CareerDates = {
+  /** Every spell in either House, gaps between them excluded. */
+  memberships: DateRange[];
+  /** Spells as Prime Minister. Empty for everyone else. */
+  pmTenures: DateRange[];
+};
+
+/**
+ * Matches the Prime Minister post itself ("Prime Minister, First Lord of the
+ * Treasury…", "Prime Minister and First Lord…") but not posts like
+ * "Prime Minister's Special Representative…".
+ */
+const PM_POST = /^Prime Minister(?:,| and\b|$)/i;
+
+function toDateRanges(
+  items: { startDate?: string | null; endDate?: string | null }[],
+): DateRange[] {
+  return items.flatMap((p) =>
+    p.startDate
+      ? [
+          {
+            startDate: p.startDate.slice(0, 10),
+            endDate: p.endDate ? p.endDate.slice(0, 10) : null,
+          },
+        ]
+      : [],
+  );
+}
+
+/** Career dates from the Biography endpoint (one fast call, ~0.4s). */
+export async function getCareerDates(id: number): Promise<CareerDates> {
+  const res = await fetch(`${BASE}/Members/${id}/Biography`);
+  if (!res.ok) {
+    throw new Error(`Members API biography(${id}) failed: ${res.status}`);
+  }
+  const { value } = BiographyResponseSchema.parse(await res.json());
+  return {
+    memberships: toDateRanges(value.houseMemberships ?? []),
+    pmTenures: toDateRanges(
+      (value.governmentPosts ?? []).filter((p) => PM_POST.test(p.name)),
+    ),
+  };
 }
