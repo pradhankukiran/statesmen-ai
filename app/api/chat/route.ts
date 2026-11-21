@@ -247,7 +247,12 @@ export async function POST(request: Request): Promise<Response> {
       model,
       system,
       messages: modelMessages,
+      // Groq's recommended Instruct-mode settings for qwen/qwen3.8-27b. Its
+      // top_k=20 and min_p=0 aren't passed: the AI SDK Groq provider drops
+      // topK, and min_p isn't exposed.
       temperature: 0.7,
+      topP: 0.8,
+      presencePenalty: 1.5,
       // Match the persona's "chamber response — focused and punchy, not
       // essays" behaviour spec. Bumped from 1500 → 2000 to give a little
       // headroom against mid-paragraph truncation, with the system-prompt
