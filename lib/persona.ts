@@ -47,6 +47,21 @@ import { summariseError } from "./models";
 const SINGLE_CALL_THRESHOLD = 80_000;
 
 /**
+ * Token cap on the collected corpus. Full speech text is ~4x longer than the
+ * old 255-char previews, so without a cap a 500-speech corpus would overflow
+ * the single-call path and fall into the slower chunk + merge path. 5%
+ * headroom covers the "\n\n" separators added when the corpus is joined.
+ */
+const CORPUS_TOKEN_BUDGET = Math.floor(SINGLE_CALL_THRESHOLD * 0.95);
+
+/**
+ * Contributions under this many words are procedural ("I refer the hon. Lady
+ * to the answer that I gave earlier.") and carry no style. Kept low on
+ * purpose: short PMQs answers are often the most characteristic lines.
+ */
+const MIN_CONTRIBUTION_WORDS = 15;
+
+/**
  * Per-LLM-call timeout. The route's `maxDuration` is 300s (Vercel Hobby
  * cap) and the route layer enforces a global ~270s working ceiling (90% of
  * 300s) propagated as an `AbortSignal` into every LLM call. A single 60s
@@ -147,21 +162,57 @@ export type BuildEvent =
 
 // ─── Fetching ─────────────────────────────────────────────────────────────────
 
+function wordCount(text: string): number {
+  const trimmed = text.trim();
+  return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
+}
+
+/**
+ * Accumulates contributions, skipping short procedural ones, until either
+ * the count cap or the token budget is reached.
+ */
+function createCollector(max: number, tokenBudget: number) {
+  const items: Contribution[] = [];
+  let tokens = 0;
+  let full = false;
+  return {
+    items,
+    /** Adds `c` if it qualifies. Returns true once the collector is full. */
+    add(c: Contribution): boolean {
+      if (full) return true;
+      if (wordCount(c.text) < MIN_CONTRIBUTION_WORDS) return false;
+      const t = countTokens(c.text);
+      if (tokens + t > tokenBudget) {
+        full = true;
+        return true;
+      }
+      items.push(c);
+      tokens += t;
+      if (items.length >= max) full = true;
+      return full;
+    },
+  };
+}
+
 export async function collectContributions(
   config: FetchConfig,
+  opts: { tokenBudget?: number } = {},
 ): Promise<Contribution[]> {
+  const collector = createCollector(
+    config.max,
+    opts.tokenBudget ?? CORPUS_TOKEN_BUDGET,
+  );
+
   if (config.kind === "memberId") {
-    const collected: Contribution[] = [];
     for await (const c of iterateContributions({
       memberId: config.memberId,
       pageSize: 100,
       pageDelayMs: 300,
       maxPages: Math.ceil(config.max / 100) + 1,
     })) {
-      collected.push(c);
-      if (collected.length >= config.max) break;
+      if (collector.add(c)) break;
     }
-    return collected;
+    return collector.items;
   }
 
   // Attribution-based path (historical figures whose MemberId is unset).
@@ -177,20 +228,18 @@ export async function collectContributions(
         }),
       ),
     );
-    const collected: Contribution[] = [];
     const seen = new Set<string>();
-    for (const { contributions } of perTerm) {
+    outer: for (const { contributions } of perTerm) {
       for (const c of contributions) {
         if (seen.has(c.id)) continue;
         seen.add(c.id);
-        collected.push(c);
+        if (collector.add(c)) break outer;
       }
     }
-    return collected.slice(0, config.max);
+    return collector.items;
   }
 
   // Date-only scan: walk all contributions, filter client-side.
-  const collected: Contribution[] = [];
   for await (const c of iterateContributions({
     startDate: config.startDate,
     endDate: config.endDate,
@@ -198,12 +247,9 @@ export async function collectContributions(
     pageDelayMs: 400,
     maxPages: config.maxScanPages ?? 30,
   })) {
-    if (c.attributedTo === config.label) {
-      collected.push(c);
-      if (collected.length >= config.max) break;
-    }
+    if (c.attributedTo === config.label && collector.add(c)) break;
   }
-  return collected;
+  return collector.items;
 }
 
 // ─── Verbatim-quote verifier ──────────────────────────────────────────────────

@@ -48,8 +48,7 @@ export type Contribution = {
 function stripXml(s: string): string {
   // Convert block-level / paragraph-style tags to `\n\n` BEFORE removing
   // anything else, so the downstream chunker (which splits on \n\s*\n) has
-  // real paragraph boundaries to work with even when ContributionText is
-  // empty and we fall back to ContributionTextFull.
+  // real paragraph boundaries to work with.
   //
   // Hansard's actual markup (verified against the live API) is small and
   // predictable: <p></p> for paragraph breaks, <blockquote>/<q> wrapping
@@ -76,13 +75,27 @@ function stripXml(s: string): string {
   );
 }
 
+/**
+ * Remove chamber stage directions that are not the speaker's own words:
+ * "[Interruption.]", "[Laughter.]", "[Hon. Members: “No!”]".
+ */
+function stripStageDirections(s: string): string {
+  return s
+    .replace(/\[\s*(?:Interruption|Laughter)\s*\.?\s*\]/gi, "")
+    .replace(/\[\s*Hon\. Members?:[^\]]*\]/gi, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 function toContribution(r: z.infer<typeof ContributionRawSchema>): Contribution {
-  // Prefer the already-clean ContributionText; fall back to stripping the full
-  // markup version if needed.
-  const text =
-    r.ContributionText && r.ContributionText.trim().length > 0
-      ? r.ContributionText.trim()
-      : stripXml(r.ContributionTextFull ?? "");
+  // Prefer the full text. `ContributionText` is a search preview that the API
+  // cuts off at ~255 characters (verified live: 74 of 100 sampled speeches
+  // were longer in `ContributionTextFull`). Fall back to the preview only
+  // when the full field is empty.
+  const full = stripXml(r.ContributionTextFull ?? "");
+  const text = stripStageDirections(
+    full.length > 0 ? full : (r.ContributionText ?? "").trim(),
+  );
   return {
     id: r.ContributionExtId,
     memberId: r.MemberId ?? -1,
@@ -181,38 +194,54 @@ export async function searchContributions(
   return { total, contributions };
 }
 
+/** Pages fetched at the same time. 5 parallel pages tested fine live. */
+const DEFAULT_PAGE_CONCURRENCY = 5;
+
 /**
  * Async iterator over contributions across pages. Yields contributions one at
- * a time. Caller may `break` early. The Hansard endpoint's `take` cap appears
- * to be 100; pageSize defaults to that. A small delay between pages keeps the
- * public API happy.
+ * a time, in page order. Caller may `break` early. The Hansard endpoint's
+ * `take` cap is 100 (larger values return 500), so pageSize defaults to that.
+ *
+ * Each page takes ~5-7s, so pages are fetched in parallel waves of
+ * `concurrency`, with a short pause between waves to stay polite to the
+ * public API.
  */
 export async function* iterateContributions(
   opts: SearchContributionsOptions & {
     pageSize?: number;
     maxPages?: number;
+    /** Pause between waves of parallel page fetches. */
     pageDelayMs?: number;
+    /** Pages fetched at the same time. Default 5. */
+    concurrency?: number;
   },
 ): AsyncGenerator<Contribution, void, unknown> {
   const pageSize = Math.min(opts.pageSize ?? 100, 100);
   const maxPages = opts.maxPages ?? Infinity;
   const pageDelayMs = opts.pageDelayMs ?? 250;
-  let skip = opts.skip ?? 0;
-  let pages = 0;
+  const concurrency = Math.max(1, opts.concurrency ?? DEFAULT_PAGE_CONCURRENCY);
+  const startSkip = opts.skip ?? 0;
+  let page = 0;
 
-  while (pages < maxPages) {
-    if (pages > 0 && pageDelayMs > 0) {
+  while (page < maxPages) {
+    if (page > 0 && pageDelayMs > 0) {
       await new Promise((r) => setTimeout(r, pageDelayMs));
     }
-    const { contributions } = await searchContributions({
-      ...opts,
-      take: pageSize,
-      skip,
-    });
-    // Trust "empty page = exhausted" rather than the unreliable total field.
-    if (contributions.length === 0) return;
-    for (const c of contributions) yield c;
-    pages++;
-    skip += pageSize;
+    const waveSize = Math.min(concurrency, maxPages - page);
+    const wave = await Promise.all(
+      Array.from({ length: waveSize }, (_, i) =>
+        searchContributions({
+          ...opts,
+          take: pageSize,
+          skip: startSkip + (page + i) * pageSize,
+        }),
+      ),
+    );
+    for (const { contributions } of wave) {
+      // Trust "empty page = exhausted" rather than the unreliable total field.
+      if (contributions.length === 0) return;
+      for (const c of contributions) yield c;
+    }
+    page += waveSize;
   }
 }
