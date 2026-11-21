@@ -31,7 +31,7 @@ type CommonFields = {
   tagline: string;
 };
 
-// ─── Attribution shape (mirrors lib/persona.ts FetchConfig "attribution") ────
+// ─── Attribution shape (mirrors lib/collect.ts FetchConfig "attribution") ────
 
 export type PopularAttribution = {
   label: string;

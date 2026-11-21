@@ -9,7 +9,7 @@
 
 import { buildSpeechIndex, searchSpeeches } from "../lib/speeches";
 import { getPopularPMs } from "../lib/popular";
-import type { FetchConfig } from "../lib/persona";
+import type { FetchConfig } from "../lib/collect";
 
 try {
   process.loadEnvFile(".env.local");

@@ -49,8 +49,7 @@ export type Contribution = {
 
 function stripXml(s: string): string {
   // Convert block-level / paragraph-style tags to `\n\n` BEFORE removing
-  // anything else, so the downstream chunker (which splits on \n\s*\n) has
-  // real paragraph boundaries to work with.
+  // anything else, so stored speeches keep real paragraph boundaries.
   //
   // Hansard's actual markup (verified against the live API) is small and
   // predictable: <p></p> for paragraph breaks, <blockquote>/<q> wrapping

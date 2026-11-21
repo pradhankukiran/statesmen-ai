@@ -48,11 +48,6 @@ Thumbs.db
 *.swp
 *.swo
 
-# Local persona cache (dev fallback before Vercel Blob is wired)
-data/personas/*.md
-data/personas/*.json
-!data/personas/.gitkeep
-
 # Scratch / experimental
 scratch/
 tmp/

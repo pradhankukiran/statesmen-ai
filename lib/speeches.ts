@@ -3,13 +3,13 @@
  * Neon, and search them by meaning.
  *
  *   buildSpeechIndex
- *     collectContributions  (lib/persona.ts — career-wide sampling)
+ *     collectContributions  (lib/collect.ts — career-wide sampling)
  *       → embedDocuments    (lib/embed.ts — Modal embedding service)
  *         → saveSpeeches    (one transaction: replace the person's rows)
  */
 
 import type { Contribution } from "./hansard";
-import { collectContributions, type FetchConfig } from "./persona";
+import { collectContributions, type FetchConfig } from "./collect";
 import { EMBED_MODEL, embedDocuments, embedQuery } from "./embed";
 import { toVectorLiteral, withDb, withTransaction } from "./db";
 import { getCareerDates } from "./members";

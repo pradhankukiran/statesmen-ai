@@ -6,7 +6,7 @@
  * events to the build page.
  */
 
-import type { FetchConfig } from "@/lib/persona";
+import type { FetchConfig } from "@/lib/collect";
 import {
   buildSpeechIndex,
   getPerson,
