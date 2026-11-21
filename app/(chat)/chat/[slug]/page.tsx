@@ -8,12 +8,22 @@ import { getPopularPMBySlug } from "@/lib/popular";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function suggestedStartersFor(name: string): string[] {
-  return [
-    `Tell me about your time in office, ${name.split(" ").slice(-1)[0]}.`,
-    "What is your view on the role of Britain in the world?",
-    "What advice would you give a young politician starting out today?",
-  ];
+/**
+ * Generic openers that work for any politician. Per-person starters (from
+ * what they actually spoke about) are a later improvement.
+ */
+const STARTERS = [
+  "What are you proudest of from your time in Parliament?",
+  "What is Britain's place in the world?",
+  "How should we fix the NHS?",
+  "What advice would you give a new MP?",
+];
+
+function subtitleFor(person: { speechCount: number; endedAt: string | null }): string {
+  const speeches = `${person.speechCount.toLocaleString("en-GB")} speeches`;
+  return person.endedAt
+    ? `${speeches} · until ${person.endedAt.slice(0, 4)}`
+    : `${speeches} · still serving`;
 }
 
 // ─── Metadata ─────────────────────────────────────────────────────────────────
@@ -71,7 +81,8 @@ export default async function ChatPage({
       slug={slug}
       name={person.name}
       photoUrl={photoUrl}
-      suggestedStarters={suggestedStartersFor(person.name)}
+      subtitle={subtitleFor(person)}
+      suggestedStarters={STARTERS}
     />
   );
 }

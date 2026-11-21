@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Hero } from "@/components/hero";
+import { SiteShell } from "@/components/layout/site-shell";
 
 type Props = {
   error: Error & { digest?: string };
@@ -17,6 +18,7 @@ export default function GlobalError({ error, reset }: Props) {
   }, [error]);
 
   return (
+    <SiteShell>
     <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14">
       <Hero
         eyebrow="Error"
@@ -25,7 +27,7 @@ export default function GlobalError({ error, reset }: Props) {
         bodyMaxWidth="max-w-none"
       >
         {error.digest ? (
-          <p className="-mt-2 mb-6 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-muted-foreground/80">
+          <p className="-mt-2 mb-6 font-mono text-label uppercase text-muted-foreground">
             digest: {error.digest}
           </p>
         ) : null}
@@ -40,5 +42,6 @@ export default function GlobalError({ error, reset }: Props) {
         </div>
       </Hero>
     </div>
+    </SiteShell>
   );
 }

@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
-import { SiteHeader } from "@/components/site-header";
-import { SiteFooter } from "@/components/site-footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,11 +37,9 @@ export default function RootLayout({
       lang="en-GB"
       className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
-        <SiteHeader />
-        <main className="flex-1 lg:min-h-0 lg:overflow-hidden">{children}</main>
-        <SiteFooter />
-      </body>
+      {/* Page chrome lives in the route-group layouts: (site) for browsing,
+          (chat) for the full-screen chat. */}
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

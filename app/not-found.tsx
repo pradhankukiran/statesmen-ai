@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { Button } from "@/components/ui/button";
 import { Hero } from "@/components/hero";
+import { SiteShell } from "@/components/layout/site-shell";
 
 export const metadata: Metadata = {
   title: "Not found — Statesmen AI",
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 
 export default function NotFound() {
   return (
+    <SiteShell>
     <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14">
       <Hero
         eyebrow="404"
@@ -23,5 +25,6 @@ export default function NotFound() {
         </Button>
       </Hero>
     </div>
+    </SiteShell>
   );
 }

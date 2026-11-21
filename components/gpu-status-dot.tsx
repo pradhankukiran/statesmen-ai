@@ -1,7 +1,6 @@
 "use client";
 
 import { startTransition, useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
 
 // ─── Contract with /api/warmup/status ─────────────────────────────────────────
 //
@@ -41,11 +40,10 @@ const DOT_CLASSES: Record<WarmState, string> = {
 /**
  * Small status dot rendered in the global header. Polls /api/warmup/status,
  * fires a fire-and-forget POST /api/warmup when the engine is cold, and
- * pauses polling while the tab is hidden. Hidden entirely on /chat/* routes
- * where the chat UI surfaces its own engine state.
+ * pauses polling while the tab is hidden. Shown in the site header and the
+ * chat header, so the service wakes on whichever page a visitor lands on.
  */
 export function GpuStatusDot() {
-  const pathname = usePathname();
   const [state, setState] = useState<WarmState>("cold");
 
   // Latest timer handle so we can cancel cleanly on unmount or state change.
@@ -149,10 +147,6 @@ export function GpuStatusDot() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
-
-  // Hide entirely inside the chat surface — that page communicates engine
-  // state through its own affordances.
-  if (pathname?.startsWith("/chat/")) return null;
 
   const label = COPY[state];
 
