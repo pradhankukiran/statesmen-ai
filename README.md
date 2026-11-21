@@ -2,203 +2,231 @@
 
 ![Statesmen AI](./public/banner.svg)
 
-**Chat with AI personas of British political figures — past and present —
-built on demand from their real recorded speeches in Hansard.**
+**Chat with British politicians, answered from their real speeches in Parliament.**
 
-[![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=000000)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
+[Live app](https://statesmen-ai.vercel.app) · [Design system](https://statesmen-ai.vercel.app/design)
 
-[![OpenRouter](https://img.shields.io/badge/OpenRouter-LLM_gateway-FACC15?style=flat-square&labelColor=0a0a0a)](https://openrouter.ai)
-[![Groq](https://img.shields.io/badge/Groq-streaming_chat-F55036?style=flat-square&labelColor=0a0a0a)](https://groq.com)
-[![Vercel AI SDK](https://img.shields.io/badge/Vercel_AI_SDK-v6-000000?style=flat-square&logo=vercel&logoColor=white)](https://sdk.vercel.ai)
-[![shadcn/ui](https://img.shields.io/badge/shadcn/ui-Base_UI-0a0a0a?style=flat-square)](https://ui.shadcn.com)
-[![Hansard](https://img.shields.io/badge/Data-UK_Parliament_Hansard-002147?style=flat-square)](https://hansard.parliament.uk)
-[![Status](https://img.shields.io/badge/status-personal_project-FACC15?style=flat-square&labelColor=0a0a0a)](#)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=000000)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Neon](https://img.shields.io/badge/Neon-Postgres_+_pgvector-00E599?style=flat-square)](https://neon.com)
+[![Modal](https://img.shields.io/badge/Modal-embeddings-7FEE64?style=flat-square)](https://modal.com)
+[![Groq](https://img.shields.io/badge/Groq-chat-F55036?style=flat-square)](https://groq.com)
 
 </div>
 
----
+> Statesmen AI is an independent project. It is not a government service and
+> is not affiliated with UK Parliament. Replies are AI-generated and are not
+> real statements by the people shown.
 
-## ✦ What it does
+## What it does
 
-Pick a Prime Minister, MP, or Lord — past or present — and have a conversation
-with an AI version of them grounded in their actual recorded speeches from the
-official **Hansard** record of the UK Parliament.
+Pick a Prime Minister, MP or Lord and ask them a question. The reply is
+written in their voice and drawn from their real speeches in
+[Hansard](https://hansard.parliament.uk), the official record of Parliament.
 
-- **Browse** a curated grid of historical and modern figures, or **search 5,000+ members** from the live Members API
-- Click *Chat with X* — the persona is built on demand from real speech data
-- First-build is cached, so future visitors get **instant chat**
-- **Era-locked**: Churchill politely refuses to discuss TikTok
+- **Prime Ministers on the home page**, and search for any current or former
+  MP or Lord.
+- **Answers grounded in real speeches.** Every question is matched to the
+  person's five closest speeches by meaning, and the reply is written from
+  those.
+- **Sources under every reply.** A "Speeches used for this answer" section
+  lists each speech with its debate, date, an excerpt and a link to Hansard.
+- **Anyone can be added.** The first chat with someone new builds their
+  persona in about 30 to 50 seconds, with live progress. After that it is
+  instant for everyone.
+- **Era-aware.** Each persona knows when their time in Parliament ended and
+  declines questions about later events.
 
-## ✦ How it works
+## How it works
 
 ```
-Homepage  →  Profile  →  click "Chat with X"
-                                 │
-                  status check ──┴── cache miss ──▶  Build pipeline (60-120s)
-                                 │                          │
-                          cache hit                    SSE stream
-                                 │                          │
-                                 ▼                          ▼
-                              Chat ◀──────────────── /chat/{slug}
+Build (once per person)                   Chat (every message)
+───────────────────────                   ────────────────────
+Members API → career and PM dates         question
+        │                                     │
+Hansard API → ~500 speeches,                  ▼
+  sampled across the whole career      embed the question (Modal)
+        │                                     │
+        ▼                                     ▼
+embed each speech (Modal,              5 closest speeches (Neon pgvector)
+  Qwen3-Embedding-0.6B)                       │
+        │                                     ▼
+        ▼                              system prompt: rules, era cutoff,
+save person + speeches + vectors         the 5 speeches
+  (Neon Postgres)                             │
+                                              ▼
+                                       stream the reply (Groq) + sources
 ```
 
-### The build pipeline (cold path, runs once per persona)
+### Building a persona
 
-1. **Fetch** — pull the figure's contributions from Hansard
-   - Modern PMs: server-side filter by `memberId`
-   - Historical figures: client-side filter by `AttributedTo` + date range, with parallel topic queries
-2. **Chunk** — token-aware split into ~8k pieces (`cl100k_base`), with a hard-slice fallback for oversized single sentences
-3. **Extract** — N parallel LLM calls extract style, vocabulary, rhetorical devices, and verbatim examples per chunk
-4. **Merge** — reduce N chunk extractions into one consolidated persona
-5. **Render** — write Markdown system prompt + JSON examples bank
-6. **Cache** — Vercel Blob in production, filesystem in dev
+1. **Career dates.** The Members API gives each spell in Parliament and any
+   time as Prime Minister.
+2. **Speech sampling.** The career is split into 12 date windows, half of
+   them covering time as Prime Minister, and one page of speeches is fetched
+   per window in parallel. Very short procedural remarks are dropped. Full
+   speech text is used, not Hansard's 255-character search preview.
+3. **Embedding.** Each speech becomes a 1,024-number vector on a
+   Modal-hosted Qwen3-Embedding-0.6B (Hugging Face Text Embeddings
+   Inference, A10G GPU).
+4. **Saving.** The person, their speeches and the vectors are written to Neon
+   in one transaction.
 
-### Runtime chat
+### Chatting
 
-User message → `/api/chat` → server loads persona's `.md` + 8 randomly-sampled
-verbatim quotes → builds the system prompt → streams Groq Llama in the persona's
-voice via the Vercel AI SDK.
+1. The latest question (plus the previous one, so follow-ups keep their
+   topic) is embedded.
+2. Neon returns the person's five closest speeches.
+3. Groq streams a reply from `qwen/qwen3.8-27b` (thinking turned off) with a
+   short set of rules: stay in character, use only these speeches for facts,
+   respect the era cutoff.
+4. The five speeches travel with the reply as message metadata and appear as
+   its sources.
 
-## ✦ Tech stack
+### Performance
+
+- Chat pages are statically generated (ISR) and served from Vercel's edge;
+  the build route refreshes a page as soon as its person is built.
+- Person lookups are cached for an hour and deduplicated per request.
+- Single reads use Neon's HTTP driver; only the build's multi-step save uses
+  a WebSocket transaction.
+
+## Tech stack
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| UI | React 19 · Tailwind CSS v4 · shadcn/ui · Lucide |
-| Streaming chat | Vercel AI SDK v6 (`useChat`, `streamText`) |
-| LLM (offline build) | OpenRouter — fallback chain across 5 free models |
-| LLM (chat) | Groq — Llama 3.3 70B / 3.1 8B Instant |
-| Validation | Zod schemas on every external API response |
-| Storage | Vercel Blob (prod) · filesystem (dev) |
-| Data sources | UK Parliament Members API + Hansard API (no key required) |
-| Tokeniser | `js-tiktoken` (cl100k_base) |
+| Framework | Next.js 16 (App Router), React 19, TypeScript |
+| UI | Tailwind CSS 4, Base UI, GOV.UK Design System aesthetics |
+| Chat model | Groq, `qwen/qwen3.8-27b`, via the Vercel AI SDK v6 |
+| Embeddings | Qwen3-Embedding-0.6B on Modal (Text Embeddings Inference, A10G) |
+| Database | Neon Postgres with pgvector |
+| Data | UK Parliament Members API and Hansard API (no key needed) |
+| Hosting | Vercel |
 
-### Multi-model failover
+## Design
 
-Free OpenRouter models are 1 RPM each per upstream provider. The pipeline tries
-each model in `OPENROUTER_MODELS` in order; on `429`, parse error, or
-`"Provider returned error"`, it rolls forward to the next model. Five different
-upstream providers gives **~5 RPM cumulative** with one API key.
+The interface follows the [GOV.UK Design System](https://design-system.service.gov.uk)
+for colour, type, spacing, focus states and components, using values from
+GOV.UK Frontend 6.6.0. It deliberately does **not** use GOV.UK branding: Arial
+replaces the GDS Transport font, and there is no crown or GOV.UK logotype. A
+Beta phase banner and the footer state that this is not a government service.
 
-```
-OPENROUTER_MODELS = nemotron, qwen3, gpt-oss, gemma-4, minimax-m2.5
-                    ↓ Nvidia   ↓ Venice ↓ OpenAI ↓ Google ↓ MiniMax
-                    ───────────────────────────────────────────────
-                    5 independent rate-limit pools
-```
+Every token and component is on the living style guide at
+[`/design`](https://statesmen-ai.vercel.app/design).
 
-## ✦ Getting started
+## Getting started
+
+You need Node.js 24 (the version Vercel runs), a [Neon](https://neon.com) database, a
+[Modal](https://modal.com) account and a [Groq](https://console.groq.com/keys)
+API key.
 
 ```bash
 git clone https://github.com/pradhankukiran/statesmen-ai
 cd statesmen-ai
 npm install
-cp .env.example .env.local          # then fill in your keys
-npm run dev                          # localhost:3000
+cp .env.example .env.local        # fill in the values below
+```
+
+**1. Create the database tables**
+
+```bash
+psql "$DATABASE_URL_UNPOOLED" -f db/schema.sql
+```
+
+**2. Deploy the embedding service**
+
+```bash
+modal secret create statesmen-embed-key API_KEY=$(openssl rand -hex 32)
+modal deploy infra/embed.py
+```
+
+Put the printed URL in `EMBED_URL` and the same key in `EMBED_API_KEY`.
+
+**3. Build the featured Prime Ministers and run the app**
+
+```bash
+npm run script:speeches -- --featured
+npm run dev                       # http://localhost:3000
 ```
 
 ### Environment variables
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `OPENROUTER_API_KEY` | ✅ | Persona build (extract + merge calls) |
-| `GROQ_API_KEY` | ✅ | Streaming chat |
-| `OPENROUTER_MODELS` | recommended | Comma-separated fallback model list |
-| `OPENROUTER_EXTRACT_MODELS` | optional | Override extract stage only |
-| `OPENROUTER_MERGE_MODELS` | optional | Override merge stage only |
-| `GROQ_CHAT_MODEL` | optional | Single chat model id |
-| `BLOB_READ_WRITE_TOKEN` | prod only | Vercel Blob (auto-injected when you create a Blob store) |
+| Variable | Purpose |
+|---|---|
+| `GROQ_API_KEY` | Streams chat replies |
+| `GROQ_CHAT_MODEL` | Optional. Chat model, default `qwen/qwen3.8-27b` |
+| `EMBED_URL` | Modal embedding service URL |
+| `EMBED_API_KEY` | Bearer key for the embedding service |
+| `DATABASE_URL` | Neon pooled connection string (used by the app) |
+| `DATABASE_URL_UNPOOLED` | Neon direct connection string (for `psql`) |
 
-Get keys: [OpenRouter](https://openrouter.ai/keys) · [Groq](https://console.groq.com/keys)
+On Vercel, adding Neon from the Marketplace fills in the database variables.
 
-### CLI scripts
+### Scripts
 
-```bash
-npm run script:fetch                  # smoke-test Hansard + Members APIs
-npm run script:extract                # chunk + run one extraction call
-npm run script:build                  # full pipeline for Boris Johnson
-npm run script:build -- --thatcher    # historical (attribution-mode) build
-```
+| Command | What it does |
+|---|---|
+| `npm run dev` | Local development server |
+| `npm run build` | Production build |
+| `npm run lint` | ESLint |
+| `npm run script:speeches` | Build Boris Johnson's persona, then run a sample search |
+| `npm run script:speeches -- --featured` | Build every featured Prime Minister |
+| `npm run script:fetch` | Smoke-test the Hansard and Members APIs |
 
-## ✦ Project structure
+## Project structure
 
 ```
 statesmen-ai/
 ├── app/
-│   ├── page.tsx                  # homepage: hero + search + popular grid
-│   ├── p/[id]/                   # profile (numeric id or slug)
-│   ├── build/[slug]/             # SSE build progress page
-│   ├── chat/[slug]/              # streaming chat
+│   ├── (site)/                 # pages with the site header and footer
+│   │   ├── page.tsx            # home: Prime Ministers grid
+│   │   ├── p/[id]/             # profile for search results
+│   │   ├── build/[slug]/       # first-time build progress
+│   │   └── design/             # living style guide
+│   ├── (chat)/chat/[slug]/     # full-screen chat (statically cached)
 │   └── api/
+│       ├── chat/               # retrieve speeches, stream reply + sources
+│       ├── persona/{build,status}
 │       ├── persons/{search,[id]}
-│       ├── persona/{status,build}
-│       └── chat
+│       └── warmup/             # wake the embedding service
 ├── components/
-│   ├── ui/                       # shadcn primitives (Base UI under the hood)
-│   ├── chat-window.tsx           # useChat + memoised markdown bubble
-│   ├── build-progress.tsx        # SSE consumer with live progress
-│   ├── chat-cta.tsx              # status-check + route to chat or build
-│   ├── search-bar.tsx            # debounced + abort-controlled search
-│   ├── person-card.tsx
-│   ├── person-grid.tsx
-│   └── site-{header,footer}.tsx
+│   ├── ui/                     # GOV.UK-style building blocks
+│   ├── chat/                   # messages, question form, sources
+│   └── layout/
 ├── lib/
-│   ├── persona.ts                # build orchestrator + renderers
-│   ├── extractor.ts              # per-chunk LLM extraction
-│   ├── merger.ts                 # consolidate N chunks → 1 persona
-│   ├── chunker.ts                # token-aware splitter
-│   ├── cache.ts                  # Blob + FS dual backend
-│   ├── hansard.ts                # Hansard API client
-│   ├── members.ts                # Members API client
-│   ├── models.ts                 # model fallback resolution
-│   ├── popular.ts                # popular-pms registry loader
-│   ├── slug.ts                   # name → cache key
-│   └── prompts/{extract,merge}.ts
-├── data/popular-pms.json         # curated featured figures
-└── scripts/                      # CLI smoke tests
+│   ├── collect.ts              # career-wide speech sampling
+│   ├── speeches.ts             # build, save and search the speech index
+│   ├── embed.ts                # embedding service client
+│   ├── chat-prompt.ts          # system prompt
+│   ├── hansard.ts, members.ts  # Parliament API clients
+│   ├── db.ts                   # Neon (HTTP reads, WebSocket transactions)
+│   └── person-cache.ts         # cached person lookup
+├── db/schema.sql               # Postgres + pgvector schema
+├── infra/embed.py              # Modal embedding service
+├── data/popular-pms.json       # featured Prime Ministers
+└── scripts/                    # CLI build and smoke tests
 ```
 
-## ✦ Design language
+## Known limits
 
-**Minimal shadcn × hint of neo-brutalism, single yellow accent.**
+- **Speech coverage.** Hansard's member-linked records seem to start around
+  2005, so earlier careers (for example most of Tony Blair's time as Prime
+  Minister) are thinly covered.
+- **Cold starts.** The embedding service sleeps after 5 idle minutes and takes
+  about 15 seconds to wake; a status dot in the header wakes it when someone
+  arrives. Neon's free plan also sleeps after 5 idle minutes.
+- **Preview chat model.** `qwen/qwen3.8-27b` is a preview model on Groq and
+  may change.
 
-- Sharp `rounded-md` edges; `rounded-none` only for brand pills
-- `border-2` everywhere a border reads
-- Brand yellow rationed: focus rings, primary CTAs, hero pills, accent stripes
-- Confident type — `text-5xl` to `text-7xl` headlines, `text-base` to `text-lg` body
-- Generous whitespace, no shadow circus, no gradients
+## Data and licences
 
-## ✦ Deploy
-
-1. Push the repo to GitHub
-2. Import the project on [Vercel](https://vercel.com/new)
-3. Paste the env vars from your `.env.local`
-4. Storage tab → **Create Blob store** → connect to project → done
-
-The Blob token is injected automatically; no copy-paste needed.
-
-## ✦ Acknowledgements
-
-- **[UK Parliament Hansard](https://hansard.parliament.uk)** — open access to the official record
-- **[UK Parliament Members API](https://members-api.parliament.uk)** — member metadata + portraits
-- **[OpenRouter](https://openrouter.ai)** + **[Groq](https://groq.com)** — LLM inference
-- **[Vercel AI SDK](https://sdk.vercel.ai)**, **[shadcn/ui](https://ui.shadcn.com)**, **[Lucide](https://lucide.dev)** — building blocks
-
-## ✦ Disclaimer
-
-Statesmen AI generates conversational AI personas from real public speeches.
-**Responses are AI-generated and do not represent actual statements** by the
-people depicted. This is a personal engineering project, not a journalistic or
-political tool.
-
----
-
-<div align="center">
-
-Built as a personal project · powered by free-tier infrastructure · open to fork
-
-</div>
+- Contains Parliamentary information licensed under the
+  [Open Parliament Licence v3.0](https://www.parliament.uk/site-information/copyright-parliament/open-parliament-licence/).
+- Official portraits from the UK Parliament Members API are licensed under
+  [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).
+- Portraits of Gordon Brown (UK National Archives, Open Government Licence
+  v3.0) and Tony Blair (Pavel Golovkin, CC BY 4.0) are from Wikimedia
+  Commons.
+- Qwen models are released under Apache 2.0.
