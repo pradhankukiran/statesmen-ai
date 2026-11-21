@@ -11,7 +11,7 @@ import type { FetchConfig } from "@/lib/collect";
 import { recordEmbedActivity } from "@/lib/warmup-state";
 import {
   buildSpeechIndex,
-  getPerson,
+  findPerson,
   type SpeechBuildEvent,
 } from "@/lib/speeches";
 
@@ -56,8 +56,8 @@ const DEFAULT_MAX = 500;
 
 type SseEvent =
   | SpeechBuildEvent
-  | { type: "ready"; cached: true }
-  | { type: "ready"; cached: false; speechCount: number }
+  | { type: "ready"; cached: true; slug: string }
+  | { type: "ready"; cached: false; slug: string; speechCount: number }
   | { type: "error"; message: string }
   | { type: "ping" };
 
@@ -336,11 +336,16 @@ export async function POST(request: Request): Promise<Response> {
 
       try {
         await withSlugLock(slug, async () => {
-          if ((await getPerson(slug)) !== null) {
+          const existing = await findPerson({
+            slug,
+            memberId:
+              fetchConfig.kind === "memberId" ? fetchConfig.memberId : null,
+          });
+          if (existing !== null) {
             // Cheap cache hit — surface immediately and skip the pipeline.
             // (Either pre-existing or just produced by a sibling build that
             // we waited on inside withSlugLock.)
-            send({ type: "ready", cached: true });
+            send({ type: "ready", cached: true, slug: existing.slug });
             return;
           }
 
@@ -354,7 +359,12 @@ export async function POST(request: Request): Promise<Response> {
 
           // Keeps the header status dot honest; runs after the response ends.
           after(recordEmbedActivity);
-          send({ type: "ready", cached: false, speechCount: result.speechCount });
+          send({
+            type: "ready",
+            cached: false,
+            slug,
+            speechCount: result.speechCount,
+          });
         });
       } catch (err) {
         // Deadline-fire already emitted its own SSE error via the

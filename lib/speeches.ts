@@ -170,25 +170,55 @@ export type StoredPerson = {
   builtAt: string;
 };
 
-/** A built person, or null if they have no speech index yet. */
+const PERSON_COLUMNS = `slug, name, member_id, ended_at::text AS ended_at,
+  speech_count, built_at::text AS built_at`;
+
+function toStoredPerson(r: Record<string, unknown>): StoredPerson {
+  return {
+    slug: r.slug as string,
+    name: r.name as string,
+    memberId: r.member_id as number | null,
+    endedAt: r.ended_at as string | null,
+    speechCount: r.speech_count as number,
+    builtAt: r.built_at as string,
+  };
+}
+
+/** A built person by slug (the /chat URL segment), or null. */
 export async function getPerson(slug: string): Promise<StoredPerson | null> {
   return withDb(async (db) => {
     const { rows } = await db.query(
-      `SELECT slug, name, member_id, ended_at::text AS ended_at, speech_count,
-              built_at::text AS built_at
-         FROM persons WHERE slug = $1`,
+      `SELECT ${PERSON_COLUMNS} FROM persons WHERE slug = $1`,
       [slug],
     );
-    const r = rows[0];
-    if (!r) return null;
-    return {
-      slug: r.slug,
-      name: r.name,
-      memberId: r.member_id,
-      endedAt: r.ended_at,
-      speechCount: r.speech_count,
-      builtAt: r.built_at,
-    };
+    return rows[0] ? toStoredPerson(rows[0]) : null;
+  });
+}
+
+/**
+ * A built person by Parliament member ID when known, else by slug. The member
+ * ID is the real identity: the same person reaches us under different slugs
+ * (featured list "tony-blair" vs Members API name "Mr Tony Blair").
+ */
+export async function findPerson(key: {
+  slug: string;
+  memberId?: number | null;
+}): Promise<StoredPerson | null> {
+  return withDb(async (db) => {
+    const { rows } =
+      key.memberId != null
+        ? await db.query(
+            `SELECT ${PERSON_COLUMNS} FROM persons
+              WHERE member_id = $1 OR slug = $2
+              ORDER BY (member_id = $1) DESC
+              LIMIT 1`,
+            [key.memberId, key.slug],
+          )
+        : await db.query(
+            `SELECT ${PERSON_COLUMNS} FROM persons WHERE slug = $1`,
+            [key.slug],
+          );
+    return rows[0] ? toStoredPerson(rows[0]) : null;
   });
 }
 

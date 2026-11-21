@@ -48,3 +48,8 @@ CREATE TABLE IF NOT EXISTS service_state (
   last_warm_at        timestamptz,
   warming_started_at  timestamptz
 );
+
+-- One persona per Parliament member: the same person can reach a build under
+-- different slugs ("tony-blair" vs "mr-tony-blair").
+CREATE UNIQUE INDEX IF NOT EXISTS persons_member_id_key
+  ON persons (member_id) WHERE member_id IS NOT NULL;

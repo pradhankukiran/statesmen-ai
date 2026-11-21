@@ -14,7 +14,7 @@
  * action below is purely the in-app idiomatic path.
  */
 
-import { getPerson, type StoredPerson } from "@/lib/speeches";
+import { findPerson, type StoredPerson } from "@/lib/speeches";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +43,7 @@ const MAX_SLUG_LENGTH = 200;
  */
 export async function checkPersonaStatusAction(
   slug: string,
+  memberId: number | null = null,
 ): Promise<PersonaStatusResult> {
   if (typeof slug !== "string") {
     return {
@@ -62,7 +63,13 @@ export async function checkPersonaStatusAction(
   }
 
   try {
-    const person = await getPerson(trimmed);
+    const validId =
+      typeof memberId === "number" && Number.isInteger(memberId) && memberId > 0
+        ? memberId
+        : null;
+    // The returned person's slug may differ from `trimmed`; callers must
+    // route to `person.slug`.
+    const person = await findPerson({ slug: trimmed, memberId: validId });
     if (person === null) return { status: "missing" };
     return { status: "ready", person };
   } catch (err) {

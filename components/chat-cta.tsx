@@ -59,7 +59,7 @@ export function ChatCta({ slug, name, memberId, hasAttribution }: Props) {
         };
       }
       try {
-        const result = await checkPersonaStatusAction(slug);
+        const result = await checkPersonaStatusAction(slug, memberId);
         return { kind: "result", result };
       } catch (err) {
         // Server actions usually surface errors via the returned value, but
@@ -80,8 +80,11 @@ export function ChatCta({ slug, name, memberId, hasAttribution }: Props) {
     if (state.kind !== "result") return;
     const result = state.result;
     if (result.status === "ready") {
+      // Route to the stored slug: the person may have been built under a
+      // different one (looked up by member ID).
+      const chatSlug = result.person.slug;
       startNavigation(() => {
-        router.push(`/chat/${slug}`);
+        router.push(`/chat/${chatSlug}`);
       });
       return;
     }

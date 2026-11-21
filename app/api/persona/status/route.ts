@@ -1,4 +1,4 @@
-import { getPerson, type StoredPerson } from "@/lib/speeches";
+import { findPerson, type StoredPerson } from "@/lib/speeches";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,8 +19,11 @@ export async function GET(request: Request): Promise<Response> {
     );
   }
 
+  const rawId = searchParams.get("memberId");
+  const memberId = rawId && /^\d+$/.test(rawId) ? Number(rawId) : null;
+
   try {
-    const person = await getPerson(slug);
+    const person = await findPerson({ slug, memberId });
     const body: StatusResponse =
       person === null ? { status: "missing" } : { status: "ready", person };
     return Response.json(body, { status: 200 });

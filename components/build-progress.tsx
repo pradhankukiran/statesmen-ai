@@ -16,7 +16,7 @@ type SseEvent =
   | { type: "embed_progress"; done: number; total: number }
   | { type: "save_start" }
   | { type: "save_done"; count: number }
-  | { type: "ready"; cached?: boolean }
+  | { type: "ready"; cached?: boolean; slug?: string }
   | { type: "error"; message: string }
   | { type: "ping" };
 
@@ -169,7 +169,8 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
           advance("ready", "Done. Opening chat…");
           finalizeAll();
           setPhase("done");
-          router.push(`/chat/${slug}`);
+          // A cache hit may be stored under a different slug (same member ID).
+          router.push(`/chat/${event.slug ?? slug}`);
           break;
         case "error":
           finalizeAll();
