@@ -34,7 +34,7 @@ export default function GlobalError({ error, reset }: Props) {
           <Button variant="primary" size="lg" onClick={() => reset()}>
             Try again
           </Button>
-          <Button variant="outline" size="lg" render={<Link href="/" />}>
+          <Button variant="secondary" size="lg" render={<Link href="/" />}>
             Back to homepage
           </Button>
         </div>

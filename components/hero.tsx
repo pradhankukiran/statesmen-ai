@@ -47,7 +47,7 @@ export function Hero({
   return (
     <header className={cn("flex w-full flex-col items-start", className)}>
       {eyebrow ? (
-        <Badge variant="brand" className="mb-6">
+        <Badge variant="accent" className="mb-6">
           {eyebrow}
         </Badge>
       ) : null}

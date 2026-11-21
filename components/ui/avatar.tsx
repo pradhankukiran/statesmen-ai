@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 //
 // A single avatar primitive used everywhere a person needs a face: the chat
 // header, assistant message bubbles, and (via wrappers) profile thumbnails.
-// Falls back to a brand-yellow initials tile when no photo is available.
+// Falls back to serif initials on the green tint when no photo is available.
 //
 // Sizes are deliberate, not arbitrary:
 //   sm  ─ assistant message bubble gutter (32px)
@@ -77,7 +77,7 @@ export function Avatar({
       className={cn(
         "shrink-0 overflow-hidden rounded-full ring-1 ring-border",
         dim,
-        hasPhoto ? "bg-muted" : "bg-brand text-brand-foreground",
+        hasPhoto ? "bg-muted" : "bg-brand-subtle text-brand",
         !hasPhoto && fallbackClassName,
         className,
       )}
@@ -95,7 +95,7 @@ export function Avatar({
       ) : (
         <span
           className={cn(
-            "flex size-full items-center justify-center font-semibold",
+            "flex size-full items-center justify-center font-serif font-medium",
             textSize,
           )}
         >

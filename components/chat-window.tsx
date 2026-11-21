@@ -17,7 +17,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { Avatar } from "@/components/avatar";
+import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -252,7 +252,7 @@ export function ChatWindow({ slug, name, photoUrl, suggestedStarters }: Props) {
                   <div>
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       onClick={() => regenerate()}
                       disabled={isBusy}
@@ -348,7 +348,7 @@ function EmptyState({
   return (
     <div className="flex flex-1 flex-col items-start justify-center gap-12 py-16 sm:py-24">
       <div className="flex flex-col items-start gap-5">
-        <Badge variant="brand">Begin conversation</Badge>
+        <Badge variant="accent">Begin conversation</Badge>
         <h2 className="text-balance text-3xl font-semibold leading-[1.1] tracking-tight sm:text-4xl">
           What would you like to ask {name}?
         </h2>
