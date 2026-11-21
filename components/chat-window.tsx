@@ -4,7 +4,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { ArrowLeft, RefreshCw, SquarePen } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -14,6 +13,7 @@ import { StarterChip } from "@/components/chat/starter-chip";
 import { GpuStatusDot } from "@/components/gpu-status-dot";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { BackLink, ErrorSummary } from "@/components/ui/govuk";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ const markdownComponents: Components = {
 // Memoised so streaming only re-parses the reply that is growing.
 const ReplyMarkdown = memo(function ReplyMarkdown({ text }: { text: string }) {
   return (
-    <div className="prose prose-neutral max-w-none text-body text-foreground prose-p:my-3 first:prose-p:mt-0 last:prose-p:mb-0 prose-a:text-foreground prose-blockquote:font-normal prose-blockquote:not-italic prose-headings:font-semibold prose-h1:text-heading prose-h2:text-heading prose-h3:text-body">
+    <div className="prose max-w-none text-body text-foreground prose-p:my-3 prose-p:leading-[1.3158] first:prose-p:mt-0 last:prose-p:mb-0 prose-a:text-link prose-blockquote:border-l-[10px] prose-blockquote:border-border prose-blockquote:font-normal prose-blockquote:not-italic prose-headings:font-bold prose-h1:text-m prose-h2:text-m prose-h3:text-body prose-strong:font-bold">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {text}
       </ReactMarkdown>
@@ -124,32 +124,37 @@ export function ChatWindow({ slug, name, photoUrl, subtitle, suggestedStarters }
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <header className="shrink-0 border-b border-border bg-background">
-        <div className="mx-auto flex h-16 w-full max-w-3xl items-center gap-3 px-4 sm:px-6">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            render={<Link href="/" aria-label="Back to all politicians" />}
+      {/* Slim brand bar, same as the site header. */}
+      <div className="shrink-0 bg-brand text-white">
+        <div className="page-width flex items-center justify-between py-2">
+          <Link
+            href="/"
+            className="text-body font-bold text-white no-underline hover:underline focus-visible:bg-focus focus-visible:text-foreground focus-visible:shadow-[0_-2px_var(--focus),0_4px_var(--foreground)] focus-visible:outline-none"
           >
-            <ArrowLeft />
-          </Button>
-          <Avatar name={name} src={photoUrl} size="md" loading="eager" />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <h1 className="truncate text-body font-semibold leading-tight">
-              {name}
-            </h1>
-            {subtitle && (
-              <p className="truncate text-small text-muted-foreground">{subtitle}</p>
+            Statesmen AI
+          </Link>
+          <GpuStatusDot />
+        </div>
+      </div>
+
+      {/* Person heading */}
+      <header className="shrink-0 border-b border-border">
+        <div className="page-width py-4">
+          <BackLink href="/">All politicians</BackLink>
+          <div className="mt-3 flex items-center gap-3">
+            <Avatar name={name} src={photoUrl} size="lg" loading="eager" />
+            <div className="min-w-0 flex-1">
+              {subtitle && (
+                <p className="truncate text-small text-muted-foreground">{subtitle}</p>
+              )}
+              <h1 className="truncate text-m font-bold">{name}</h1>
+            </div>
+            {hasMessages && (
+              <Button variant="secondary" size="sm" onClick={newChat}>
+                New chat
+              </Button>
             )}
           </div>
-          <GpuStatusDot />
-          {hasMessages && (
-            <Button variant="ghost" size="sm" onClick={newChat}>
-              <SquarePen />
-              <span className="hidden sm:inline">New chat</span>
-            </Button>
-          )}
         </div>
       </header>
 
@@ -159,9 +164,9 @@ export function ChatWindow({ slug, name, photoUrl, subtitle, suggestedStarters }
         onScroll={onScroll}
         className="min-h-0 flex-1 overflow-y-auto"
       >
-        <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 py-8 sm:px-6">
+        <div className="page-width flex min-h-full flex-col py-6">
           {hasMessages ? (
-            <ol className="flex flex-col gap-8">
+            <ol className="flex max-w-[40rem] flex-col gap-6">
               {messages.map((message) => {
                 const text = messageText(message);
                 if (message.role === "user") {
@@ -191,19 +196,17 @@ export function ChatWindow({ slug, name, photoUrl, subtitle, suggestedStarters }
               )}
 
               {error && (
-                <li role="alert" className="flex flex-col items-start gap-3 rounded-lg bg-destructive/5 p-4 ring-1 ring-inset ring-destructive/20">
-                  <p className="text-small text-destructive">
-                    {errorText(error)}
-                  </p>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => regenerate()}
-                    disabled={isBusy}
-                  >
-                    <RefreshCw />
-                    Try again
-                  </Button>
+                <li>
+                  <ErrorSummary title="There is a problem">
+                    <p className="mb-5">{errorText(error)}</p>
+                    <Button
+                      variant="secondary"
+                      onClick={() => regenerate()}
+                      disabled={isBusy}
+                    >
+                      Try again
+                    </Button>
+                  </ErrorSummary>
                 </li>
               )}
             </ol>
@@ -218,20 +221,22 @@ export function ChatWindow({ slug, name, photoUrl, subtitle, suggestedStarters }
         </div>
       </div>
 
-      {/* Message box */}
+      {/* Question form */}
       <div className="shrink-0 border-t border-border bg-background">
-        <div className="mx-auto w-full max-w-3xl px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
+        <div className="page-width pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <Composer
             value={input}
             onChange={setInput}
             onSend={send}
             onStop={() => void stop()}
             busy={isBusy}
-            placeholder={`Ask ${name} a question…`}
+            label={`Ask ${name} a question`}
             autoFocus
+            className="max-w-[40rem]"
           />
-          <p className="mt-2 text-center text-label text-muted-foreground">
-            AI-generated from Hansard speeches. Not real statements by {name}.
+          <p className="mt-2 max-w-[40rem] text-small text-muted-foreground">
+            Replies are AI-generated from Hansard speeches. They are not real
+            statements by {name}.
           </p>
         </div>
       </div>
@@ -252,12 +257,13 @@ function EmptyState({
   onStarter: (s: string) => void;
 }) {
   return (
-    <div className="mt-auto flex flex-col gap-3">
-      <p className="text-small text-muted-foreground">
-        Ask {name} anything. Replies are drawn from their real speeches in
-        Parliament. Some ideas:
+    <div className="max-w-[40rem]">
+      <p className="text-body">
+        Ask {name} about anything they spoke on in Parliament. Each answer is
+        drawn from their real speeches.
       </p>
-      <ul className="flex flex-col gap-1.5">
+      <h2 className="mt-6 mb-3 text-body font-bold">Try asking</h2>
+      <ul className="flex flex-col gap-3">
         {starters.map((starter) => (
           <li key={starter}>
             <StarterChip onClick={() => onStarter(starter)}>{starter}</StarterChip>

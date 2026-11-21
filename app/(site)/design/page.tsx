@@ -4,15 +4,20 @@ import { ComposerDemo } from "./composer-demo";
 import { PersonaMessage, UserMessage } from "@/components/chat/message";
 import { SourceCard } from "@/components/chat/source-card";
 import { StarterChip } from "@/components/chat/starter-chip";
-import { Hero } from "@/components/hero";
 import { PersonCard } from "@/components/person-card";
-import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  BackLink,
+  Details,
+  ErrorSummary,
+  InsetText,
+  NotificationBanner,
+  PageHeading,
+  SummaryList,
+} from "@/components/ui/govuk";
 import { Input } from "@/components/ui/input";
 import { PartyLabel } from "@/components/ui/party-label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 
 // Living style guide. Not linked from the app; visit /design directly.
 export const metadata: Metadata = {
@@ -21,28 +26,23 @@ export const metadata: Metadata = {
 };
 
 const COLOURS = [
-  { name: "Background", token: "background", hex: "#ffffff", className: "bg-background" },
-  { name: "Text", token: "foreground", hex: "#18181b", className: "bg-foreground" },
-  { name: "Muted", token: "muted", hex: "#f4f4f5", className: "bg-muted" },
-  { name: "Muted text", token: "muted-foreground", hex: "#63636b", className: "bg-muted-foreground" },
-  { name: "Border", token: "border", hex: "#e4e4e7", className: "bg-border" },
-  { name: "Input", token: "input", hex: "#d4d4d8", className: "bg-input" },
-  { name: "Primary", token: "brand", hex: "#18181b", className: "bg-brand" },
-  { name: "Error", token: "destructive", hex: "#b42318", className: "bg-destructive" },
-];
-
-const TYPE = [
-  { name: "title", className: "text-title font-semibold tracking-tight", sample: "Chat with British politicians" },
-  { name: "heading", className: "text-heading font-semibold", sample: "Prime Ministers" },
-  { name: "body", className: "text-body", sample: "We faced a global banking crisis, and we had to deal with it decisively." },
-  { name: "small", className: "text-small text-muted-foreground", sample: "Labour · 2007–2010" },
-  { name: "label", className: "text-label text-muted-foreground", sample: "17 November 2008 · G20 Summit" },
+  { name: "Text", hex: "#0b0c0c" },
+  { name: "Secondary text", hex: "#484949" },
+  { name: "Link", hex: "#1a65a6" },
+  { name: "Link hover", hex: "#0f385c" },
+  { name: "Brand blue", hex: "#1d70b8" },
+  { name: "Green (actions)", hex: "#0f7a52" },
+  { name: "Red (errors)", hex: "#ca3535" },
+  { name: "Focus yellow", hex: "#ffdd00" },
+  { name: "Border", hex: "#cecece" },
+  { name: "Light grey", hex: "#f3f3f3" },
+  { name: "Surface", hex: "#f4f8fb" },
 ];
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-5 border-t border-border pt-8">
-      <h2 className="text-heading font-semibold">{title}</h2>
+    <section className="mt-12 border-t border-border pt-8">
+      <h2 className="mb-5 text-l font-bold">{title}</h2>
       {children}
     </section>
   );
@@ -50,140 +50,127 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function DesignPage() {
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-6 py-12 lg:h-full lg:overflow-y-auto">
-      <Hero
-        headline="Design system"
-        body="Plain and functional: white, near-black, neutral greys, one sans font. Every screen is built from the pieces on this page."
-      />
+    <>
+      <PageHeading caption="Statesmen AI" size="xl">
+        Design system
+      </PageHeading>
+      <p className="mt-5 max-w-[40rem] text-m">
+        Built to GOV.UK Design System rules (colour, type, spacing, focus and
+        components) without GOV.UK branding: Arial instead of GDS Transport,
+        no crown, no GOV.UK logotype.
+      </p>
 
       <Section title="Colour">
-        <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-5 tablet:grid-cols-4">
           {COLOURS.map((c) => (
-            <li key={c.token} className="overflow-hidden rounded-lg bg-card ring-1 ring-border">
-              <div className={`h-12 ${c.className} border-b border-border`} />
-              <div className="p-3">
-                <div className="text-small font-medium">{c.name}</div>
-                <div className="font-mono text-label text-muted-foreground">
-                  {c.token} · {c.hex}
-                </div>
-              </div>
+            <li key={c.hex + c.name}>
+              <div className="h-14 border border-border" style={{ backgroundColor: c.hex }} />
+              <p className="mt-2 text-small font-bold">{c.name}</p>
+              <p className="font-mono text-small text-muted-foreground">{c.hex}</p>
             </li>
           ))}
         </ul>
       </Section>
 
       <Section title="Type">
-        <ul className="flex flex-col gap-6">
-          {TYPE.map((t) => (
-            <li key={t.name} className="grid gap-1 sm:grid-cols-[9rem_1fr] sm:items-baseline">
-              <code className="font-mono text-label text-muted-foreground">{t.name}</code>
-              <span className={t.className}>{t.sample}</span>
-            </li>
-          ))}
-        </ul>
+        <p className="text-xl font-bold">Heading XL 48px</p>
+        <p className="mt-4 text-l font-bold">Heading L 36px</p>
+        <p className="mt-4 text-m font-bold">Heading M 24px</p>
+        <p className="mt-4 text-body font-bold">Heading S 19px</p>
+        <p className="mt-4 text-m">Lead paragraph 24px</p>
+        <p className="mt-4 text-body">Body 19px. We faced a global banking crisis, and we had to deal with it decisively.</p>
+        <p className="mt-4 text-small">Body small 16px</p>
+        <p className="mt-4 text-body">
+          <a href="#" className="link">A link</a> — tab to it to see the yellow focus state.
+        </p>
       </Section>
 
       <Section title="Buttons">
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="primary">Primary</Button>
+        <div className="flex flex-wrap items-start gap-4">
+          <Button variant="primary">Save and continue</Button>
           <Button variant="secondary">Secondary</Button>
-          <Button variant="ghost">Ghost</Button>
-          <Button variant="destructive">Destructive</Button>
-          <Button variant="link">Link</Button>
+          <Button variant="warning">Delete</Button>
           <Button variant="primary" disabled>Disabled</Button>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="primary" size="sm">Small</Button>
-          <Button variant="primary" size="md">Medium</Button>
-          <Button variant="primary" size="lg">Large</Button>
+          <Button variant="primary" size="lg">Start chat →</Button>
         </div>
       </Section>
 
-      <Section title="Badges and labels">
-        <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="neutral">500 speeches</Badge>
-          <Badge variant="outline">Commons</Badge>
-          <Badge variant="destructive">Failed</Badge>
+      <Section title="Tags">
+        <div className="flex flex-wrap gap-3">
+          <Badge variant="blue">In progress</Badge>
+          <Badge variant="green">Completed</Badge>
+          <Badge variant="grey">Not started</Badge>
+          <Badge variant="red">Failed</Badge>
+          <Badge variant="yellow">Beta</Badge>
         </div>
-        <div className="flex flex-wrap items-center gap-5 text-small text-muted-foreground">
+        <div className="mt-5 flex flex-wrap gap-6 text-body">
           <PartyLabel party="Labour" color="#d50000" />
           <PartyLabel party="Conservative" color="#0063ba" />
-          <PartyLabel party="Liberal Democrat" color="#faa61a" />
           <PartyLabel party="Crossbench" color={null} />
         </div>
       </Section>
 
-      <Section title="Fields">
-        <div className="grid max-w-xl gap-3">
-          <Input placeholder="Search politicians…" />
-          <Textarea placeholder="Multi-line text…" rows={2} />
-        </div>
+      <Section title="Form fields">
+        <label htmlFor="demo-search" className="mb-2 block text-body font-bold">
+          Search politicians
+        </label>
+        <Input id="demo-search" className="max-w-[30rem]" />
       </Section>
 
-      <Section title="Avatars and loading">
-        <div className="flex flex-wrap items-center gap-4">
-          <Avatar name="Boris Johnson" src="https://members-api.parliament.uk/api/Members/1423/Thumbnail" size="xl" />
-          <Avatar name="Boris Johnson" src="https://members-api.parliament.uk/api/Members/1423/Thumbnail" size="lg" />
-          <Avatar name="Gordon Brown" size="lg" />
-          <Avatar name="Gordon Brown" size="md" />
-          <Avatar name="Gordon Brown" size="sm" />
-          <Skeleton className="h-10 w-40" />
-        </div>
+      <Section title="Patterns">
+        <BackLink href="/design">Back</BackLink>
+        <SummaryList
+          className="mt-6 max-w-[40rem]"
+          rows={[
+            { key: "Party", value: <PartyLabel party="Labour" color="#d50000" /> },
+            { key: "House", value: "House of Commons" },
+            { key: "Years", value: "1983–2015" },
+          ]}
+        />
+        <InsetText className="mt-6 max-w-[40rem]">
+          Replies are AI-generated. They are not real statements.
+        </InsetText>
+        <Details summary="Speeches used for this answer" className="mt-6 max-w-[40rem]">
+          <SourceCard
+            date="17 November 2008"
+            debate="G20 Summit"
+            excerpt="When the right hon. and learned Gentleman was Chancellor, debt was 44 per cent. of GDP."
+            href="https://hansard.parliament.uk"
+          />
+        </Details>
+        <NotificationBanner title="Important" className="mt-6 max-w-[40rem]">
+          Preparing this persona for the first time. It usually takes under a minute.
+        </NotificationBanner>
+        <ErrorSummary className="mt-6 max-w-[40rem]">
+          <p>Speech search is unavailable. Please try again.</p>
+        </ErrorSummary>
       </Section>
 
-      <Section title="Person card">
-        <div className="grid max-w-2xl grid-cols-2 gap-4 sm:grid-cols-3">
-          <PersonCard
-            id={1423}
-            name="Boris Johnson"
-            party="Conservative"
-            partyColor="#0063ba"
-            term="2019–2022"
-            href="/design"
-          />
-          <PersonCard
-            id="example"
-            name="Gordon Brown"
-            party="Labour"
-            partyColor="#d50000"
-            term="2007–2010"
-            photoUrl={null}
-            href="/design"
-          />
+      <Section title="Person">
+        <div className="grid max-w-[30rem] grid-cols-2 gap-5">
+          <PersonCard id={1423} name="Boris Johnson" party="Conservative" partyColor="#0063ba" term="2019–2022" href="/design" />
+          <PersonCard id="example" name="Gordon Brown" party="Labour" partyColor="#d50000" term="2007–2010" photoUrl={null} href="/design" />
         </div>
       </Section>
 
       <Section title="Chat">
-        <div className="flex max-w-2xl flex-col gap-6 rounded-lg bg-background p-4 ring-1 ring-border">
-          <div className="flex flex-col gap-1.5">
-            <StarterChip>How did you handle the 2008 banking crisis?</StarterChip>
-            <StarterChip>What did you make of the G20 summit?</StarterChip>
-          </div>
+        <div className="flex max-w-[40rem] flex-col gap-6">
+          <ul className="flex flex-col gap-3">
+            <li><StarterChip>How did you handle the 2008 banking crisis?</StarterChip></li>
+            <li><StarterChip>What did you make of the G20 summit?</StarterChip></li>
+          </ul>
           <UserMessage>How did you handle the 2008 banking crisis?</UserMessage>
           <PersonaMessage name="Gordon Brown">
-            <p>
+            <p className="text-body">
               We faced a global banking crisis, and we had to deal with it
               decisively. The first thing to do was to provide liquidity to the
               banking system.
             </p>
           </PersonaMessage>
           <PersonaMessage name="Gordon Brown" pending />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <SourceCard
-              date="17 November 2008"
-              debate="G20 Summit"
-              excerpt="When the right hon. and learned Gentleman was Chancellor, debt was 44 per cent. of GDP."
-              href="https://hansard.parliament.uk"
-            />
-            <SourceCard
-              date="29 March 2010"
-              debate="European Council"
-              excerpt="We had a global banking crisis, and we had to recapitalise the banks."
-            />
-          </div>
           <ComposerDemo />
         </div>
       </Section>
-    </div>
+    </>
   );
 }

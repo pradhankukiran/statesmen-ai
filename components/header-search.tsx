@@ -200,14 +200,14 @@ export function HeaderSearch({
           }}
           placeholder={placeholder}
           aria-label="Search politicians"
-          className="h-9 pl-9 pr-9 text-sm"
+          className="h-10 border-foreground pl-9 pr-9"
         />
         {hasQuery ? (
           <button
             type="button"
             onClick={handleClear}
             aria-label="Clear search"
-            className="absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+            className="focus-box absolute right-2 top-1/2 flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center text-muted-foreground hover:text-foreground"
           >
             <X className="size-3.5" />
           </button>
@@ -218,7 +218,7 @@ export function HeaderSearch({
         <div
           id={listboxId}
           role="listbox"
-          className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[min(70vh,28rem)] overflow-y-auto rounded-lg border border-border bg-background shadow-lg shadow-black/5"
+          className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[min(70vh,28rem)] overflow-y-auto border-2 border-foreground bg-background text-foreground"
         >
           {optimisticState.kind === "loading" ? (
             <ResultsSkeleton />
@@ -247,9 +247,9 @@ function ResultsSkeleton() {
       {Array.from({ length: 5 }).map((_, i) => (
         <li
           key={i}
-          className="flex items-center gap-3 rounded-md px-2.5 py-2"
+          className="flex items-center gap-3 px-2.5 py-2"
         >
-          <Skeleton className="size-10 shrink-0 rounded-md" />
+          <Skeleton className="size-10 shrink-0" />
           <div className="min-w-0 flex-1 space-y-1.5">
             <Skeleton className="h-3.5 w-2/3" />
             <Skeleton className="h-3 w-1/2" />
@@ -264,10 +264,10 @@ function ResultsError({ message }: { message: string }) {
   return (
     <div
       role="alert"
-      className="px-3 py-2.5 text-xs text-destructive"
+      className="border-l-[5px] border-destructive px-3 py-2.5 text-small"
     >
-      <p className="font-medium">Search failed</p>
-      <p className="mt-0.5 text-destructive/80">{message}</p>
+      <p className="font-bold text-destructive">Search failed</p>
+      <p className="mt-0.5">{message}</p>
     </div>
   );
 }
@@ -287,12 +287,11 @@ function Results({
 }) {
   if (items.length === 0) {
     return (
-      <div className="px-3 py-3 text-xs text-muted-foreground">
-        <p>
-          No matches for{" "}
-          <span className="text-foreground">&ldquo;{query}&rdquo;</span>.
+      <div className="px-3 py-3 text-small">
+        <p className="font-bold">
+          No matches for &ldquo;{query}&rdquo;
         </p>
-        <p className="mt-1 text-muted-foreground/80">
+        <p className="mt-1 text-muted-foreground">
           Try a different name, or include both first and last names.
         </p>
       </div>
@@ -304,21 +303,19 @@ function Results({
       {pendingQuery ? (
         <div
           aria-live="polite"
-          className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-label"
+          className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-small"
         >
-          <Badge variant="outline" className="font-normal">
-            Searching “{pendingQuery}”…
-          </Badge>
+          <Badge variant="grey">Searching “{pendingQuery}”…</Badge>
           <span className="text-muted-foreground">previous results</span>
         </div>
       ) : null}
-      <ul className="p-1.5">
+      <ul>
         {items.map((m) => (
           <ResultRow key={m.id} member={m} onSelect={onSelect} />
         ))}
       </ul>
       {total > items.length ? (
-        <div className="border-t border-border px-3 py-2 text-label text-muted-foreground">
+        <div className="border-t border-border px-3 py-2 text-small text-muted-foreground">
           Showing {items.length} of {total}
         </div>
       ) : null}
@@ -345,9 +342,9 @@ function ResultRow({
       <Link
         href={`/p/${member.id}`}
         onClick={onSelect}
-        className="flex items-center gap-3 rounded-md px-2.5 py-2 outline-none transition-colors hover:bg-muted focus-visible:bg-muted"
+        className="flex items-center gap-3 border-b border-border px-3 py-2 outline-none hover:bg-muted focus-visible:bg-focus"
       >
-        <div className="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted">
+        <div className="relative size-10 shrink-0 overflow-hidden bg-muted">
           {photo ? (
             <Image
               src={photo}
@@ -366,9 +363,9 @@ function ResultRow({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-small font-medium">{name}</div>
+          <div className="truncate text-small font-bold text-link underline underline-offset-[0.1578em]">{name}</div>
           {subtitle ? (
-            <div className="truncate text-xs text-muted-foreground">
+            <div className="truncate text-small text-muted-foreground">
               {subtitle}
             </div>
           ) : null}

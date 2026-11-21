@@ -20,7 +20,7 @@ export function ComposerDemo() {
         }}
         onStop={() => setBusy(false)}
         busy={busy}
-        placeholder="Message Gordon Brown…"
+        label="Ask Gordon Brown a question"
       />
       <p className="text-small text-muted-foreground">
         Send to see the stop state for 2.5 seconds.

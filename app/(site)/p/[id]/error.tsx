@@ -23,7 +23,7 @@ export default function ProfileError({ error, reset }: Props) {
         body="The Members API didn't respond as expected. This is usually transient — try again, or pick someone else from the homepage."
       >
         {error.digest ? (
-          <p className="-mt-2 mb-6 font-mono text-label text-muted-foreground">
+          <p className="-mt-2 mb-6 font-mono text-small text-muted-foreground">
             digest: {error.digest}
           </p>
         ) : null}

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-/** Suggested opening question. */
+/** Suggested question, styled as a GOV.UK link. */
 export function StarterChip({
   children,
   onClick,
@@ -17,10 +17,7 @@ export function StarterChip({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={cn(
-        "cursor-pointer rounded-md bg-card px-3 py-2 text-left text-small ring-1 ring-inset ring-border transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
-        className,
-      )}
+      className={cn("link cursor-pointer text-left text-body disabled:cursor-not-allowed disabled:opacity-50", className)}
     >
       {children}
     </button>

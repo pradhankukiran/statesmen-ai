@@ -1,15 +1,21 @@
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { PhaseBanner } from "@/components/ui/govuk";
 
-/**
- * Browsing layout: header with search, page content, footer. On large
- * screens the page fits the viewport and inner regions scroll.
- */
+/** Browsing layout: header, phase banner, page content, footer. */
 export function SiteShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
+    <div className="flex min-h-dvh flex-col">
       <SiteHeader />
-      <main className="flex-1 lg:min-h-0 lg:overflow-hidden">{children}</main>
+      <PhaseBanner tag="Beta">
+        This is not a government service. Replies are AI-generated from real
+        speeches in Parliament.
+      </PhaseBanner>
+      {/* page-width uses auto margins, which would shrink a flex item to
+          its content; the plain block wrapper keeps it full width. */}
+      <main className="flex-1">
+        <div className="page-width pt-6 pb-10 tablet:pt-10 tablet:pb-16">{children}</div>
+      </main>
       <SiteFooter />
     </div>
   );

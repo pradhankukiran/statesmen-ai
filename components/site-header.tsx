@@ -1,34 +1,33 @@
 import Link from "next/link";
-import { Landmark } from "lucide-react";
 
 import { GpuStatusDot } from "@/components/gpu-status-dot";
 import { HeaderSearch } from "@/components/header-search";
 
-// Top-of-page chrome: brand mark, search, and the speech-search status dot.
+/**
+ * GOV.UK-style header bar in brand blue, carrying our own name only (no
+ * crown or GOV.UK logotype), with politician search on the right.
+ */
 export function SiteHeader() {
   return (
-    <header className="border-b border-border">
-      <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-4 px-6 sm:gap-6">
-        <Link
-          href="/"
-          aria-label="Statesmen AI — home"
-          className="group flex shrink-0 items-center gap-2.5 rounded-md font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
-          <span className="flex size-8 items-center justify-center rounded-md bg-brand text-brand-foreground transition-colors group-hover:bg-brand-hover">
-            <Landmark className="size-[1.125rem]" aria-hidden />
-          </span>
-          <span className="hidden text-base transition-colors group-hover:text-foreground/80 sm:inline">
+    <header className="bg-brand text-white">
+      <div className="page-width flex flex-col gap-3 py-3 tablet:flex-row tablet:items-center tablet:gap-6 tablet:py-4">
+        <div className="flex items-center justify-between gap-4">
+          <Link
+            href="/"
+            className="text-[1.5rem] leading-none font-bold tracking-tight text-white no-underline hover:underline hover:decoration-[3px] focus-visible:bg-focus focus-visible:text-foreground focus-visible:shadow-[0_-2px_var(--focus),0_4px_var(--foreground)] focus-visible:outline-none"
+          >
             Statesmen AI
+          </Link>
+          <span className="tablet:hidden">
+            <GpuStatusDot />
           </span>
-        </Link>
-        <div className="min-w-0 flex-1">
-          <div className="mx-auto w-full max-w-md">
-            <HeaderSearch />
-          </div>
         </div>
-        <div className="ml-1 flex shrink-0 items-center">
+        <div className="text-foreground tablet:ml-auto tablet:w-80">
+          <HeaderSearch />
+        </div>
+        <span className="hidden tablet:inline-flex">
           <GpuStatusDot />
-        </div>
+        </span>
       </div>
     </header>
   );

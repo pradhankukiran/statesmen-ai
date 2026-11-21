@@ -3,35 +3,50 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-// Button
-//   primary     ─ Near-black fill. One per view: the main action.
-//   secondary   ─ White surface with a border. Alternative actions.
-//   ghost       ─ No chrome until hover. Toolbar and icon actions.
-//   destructive ─ Tinted red. Irreversible actions.
-//   link        ─ Inline text action.
+// GOV.UK button: square, sits on a 2px shadow, presses down 2px when
+// clicked, turns yellow with black text on keyboard focus.
+//   primary   ─ green. The main action on a page.
+//   secondary ─ light grey. Other actions.
+//   warning   ─ red. Destructive actions.
+//   ghost     ─ no chrome. Icon actions in toolbars.
+//   link      ─ looks like a link.
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-sm font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 border-2 border-transparent text-center whitespace-nowrap select-none active:top-[2px] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:top-0 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[1.1em]",
   {
     variants: {
       variant: {
-        primary: "bg-brand text-brand-foreground hover:bg-brand-hover",
+        primary:
+          "bg-action text-white shadow-[0_2px_0_var(--action-shadow)] hover:bg-action-hover active:shadow-none disabled:hover:bg-action",
         secondary:
-          "bg-card text-foreground ring-1 ring-inset ring-input hover:bg-muted",
-        ghost: "text-foreground hover:bg-muted",
-        destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/15 focus-visible:ring-destructive/30",
-        link: "text-foreground underline underline-offset-4 hover:text-muted-foreground",
+          "bg-[#f3f3f3] text-foreground shadow-[0_2px_0_#858686] hover:bg-[#cecece] active:shadow-none disabled:hover:bg-[#f3f3f3]",
+        warning:
+          "bg-destructive text-white shadow-[0_2px_0_#651b1b] hover:bg-[#982828] active:shadow-none",
+        ghost: "text-foreground hover:bg-muted active:top-0",
+        link: "text-link underline underline-offset-[0.1578em] hover:text-link-hover active:top-0",
       },
       size: {
-        sm: "h-8 px-3 text-small [&_svg:not([class*='size-'])]:size-3.5",
-        md: "h-10 px-4 text-small",
-        lg: "h-12 px-6 text-body [&_svg:not([class*='size-'])]:size-[1.125rem]",
-        icon: "size-10",
-        "icon-sm": "size-8 [&_svg:not([class*='size-'])]:size-3.5",
+        sm: "px-2 pt-1 pb-[3px] text-small",
+        md: "px-2.5 pt-2 pb-[7px] text-body leading-none",
+        lg: "px-4 pt-2.5 pb-2 text-m font-bold leading-none",
+        icon: "size-10 p-0",
+        "icon-sm": "size-8 p-0",
       },
     },
+    compoundVariants: [
+      // Keyboard focus: GOV.UK yellow with black text and shadow.
+      {
+        variant: ["primary", "secondary", "warning"],
+        className:
+          "focus-visible:border-focus focus-visible:bg-focus focus-visible:text-foreground focus-visible:shadow-[0_2px_0_var(--foreground)] focus-visible:outline-none",
+      },
+      {
+        variant: ["ghost", "link"],
+        className:
+          "focus-visible:bg-focus focus-visible:text-foreground focus-visible:shadow-[0_-2px_var(--focus),0_4px_var(--foreground)] focus-visible:outline-none focus-visible:no-underline",
+      },
+    ],
     defaultVariants: {
-      variant: "secondary",
+      variant: "primary",
       size: "md",
     },
   }
@@ -39,7 +54,7 @@ const buttonVariants = cva(
 
 function Button({
   className,
-  variant = "secondary",
+  variant = "primary",
   size = "md",
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {

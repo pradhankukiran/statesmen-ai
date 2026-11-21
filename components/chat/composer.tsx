@@ -1,16 +1,15 @@
 "use client";
 
-import { ArrowUp, Square } from "lucide-react";
-import { useRef, type FormEvent, type KeyboardEvent } from "react";
+import { useId, useRef, type FormEvent, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 /**
- * Message box with a send button. The field never disables, so typing and
- * focus survive while a reply streams; during a reply the send button turns
- * into a stop button. Enter sends; Shift+Enter adds a line.
+ * GOV.UK-style question form: label, textarea, green Send button. The field
+ * never disables, so typing and focus survive while a reply streams; during
+ * a reply a grey Stop button appears. Enter sends; Shift+Enter adds a line.
  */
 export function Composer({
   value,
@@ -18,7 +17,8 @@ export function Composer({
   onSend,
   onStop,
   busy = false,
-  placeholder = "Ask a question…",
+  label = "Your question",
+  hint,
   autoFocus = false,
   className,
 }: {
@@ -27,10 +27,12 @@ export function Composer({
   onSend: (text: string) => void;
   onStop?: () => void;
   busy?: boolean;
-  placeholder?: string;
+  label?: string;
+  hint?: string;
   autoFocus?: boolean;
   className?: string;
 }) {
+  const id = useId();
   const fieldRef = useRef<HTMLTextAreaElement | null>(null);
   const canSend = !busy && value.trim().length > 0;
 
@@ -53,46 +55,33 @@ export function Composer({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className={cn(
-        "flex items-end gap-2 rounded-lg bg-card p-1.5 ring-1 ring-input transition-shadow focus-within:ring-foreground/40",
-        className,
-      )}
-    >
-      <Textarea
-        ref={fieldRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        rows={1}
-        autoFocus={autoFocus}
-        spellCheck
-        className="max-h-48 bg-transparent px-2 ring-0 focus-visible:ring-0"
-      />
-      {busy && onStop ? (
-        <Button
-          type="button"
-          variant="secondary"
-          size="icon"
-          onClick={onStop}
-          aria-label="Stop reply"
-        >
-          <Square className="size-3.5 fill-current" />
-        </Button>
-      ) : (
-        <Button
-          type="submit"
-          variant="primary"
-          size="icon"
-          disabled={!canSend}
-          aria-label="Send"
-        >
-          <ArrowUp />
-        </Button>
-      )}
+    <form onSubmit={handleSubmit} className={cn("flex flex-col gap-2", className)}>
+      <label htmlFor={id} className="text-body font-bold">
+        {label}
+      </label>
+      {hint && <p className="-mt-1 text-small text-muted-foreground">{hint}</p>}
+      <div className="flex items-end gap-3">
+        <Textarea
+          id={id}
+          ref={fieldRef}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={1}
+          autoFocus={autoFocus}
+          spellCheck
+          className="max-h-40"
+        />
+        {busy && onStop ? (
+          <Button type="button" variant="secondary" onClick={onStop} className="mb-0.5">
+            Stop
+          </Button>
+        ) : (
+          <Button type="submit" variant="primary" disabled={!canSend} className="mb-0.5">
+            Send
+          </Button>
+        )}
+      </div>
     </form>
   );
 }

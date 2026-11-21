@@ -25,7 +25,7 @@ export default function GlobalError({ error, reset }: Props) {
         body="An unexpected error interrupted the page. Try again — and if it sticks, head back to the homepage."
       >
         {error.digest ? (
-          <p className="-mt-2 mb-6 font-mono text-label text-muted-foreground">
+          <p className="-mt-2 mb-6 font-mono text-small text-muted-foreground">
             digest: {error.digest}
           </p>
         ) : null}

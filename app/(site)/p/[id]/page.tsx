@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 
 import { ChatCta } from "@/components/chat-cta";
 import { PartyLabel } from "@/components/ui/party-label";
+import { BackLink, InsetText, PageHeading, SummaryList } from "@/components/ui/govuk";
 import { getMember, getMemberPhotoUrl, type Member } from "@/lib/members";
 import {
   displayNameForMember,
@@ -138,21 +139,33 @@ export default async function ProfilePage({
   const { id } = await params;
   const profile = await loadProfile(id);
 
-  const meta = [profile.house, profile.term].filter(Boolean).join(" · ");
   const portraitName = `portrait-${profile.memberId ?? profile.popular?.slug ?? id}`;
+  const rows = [
+    { key: "Party", value: profile.party ? <PartyLabel party={profile.party} color={profile.partyColor} /> : "Unknown" },
+    { key: "House", value: profile.house === "Lords" ? "House of Lords" : "House of Commons" },
+    ...(profile.term ? [{ key: "Years", value: profile.term }] : []),
+    ...(profile.fullTitle && profile.fullTitle !== profile.name
+      ? [{ key: "Full title", value: profile.fullTitle }]
+      : []),
+  ];
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-16 lg:h-full lg:overflow-y-auto">
-      <section className="flex flex-col gap-8 sm:flex-row sm:items-start sm:gap-10">
+    <>
+      <BackLink href="/" className="mb-6">All politicians</BackLink>
+      <PageHeading caption={profile.house === "Lords" ? "Member of the House of Lords" : "Member of Parliament"}>
+        {profile.name}
+      </PageHeading>
+
+      <div className="mt-8 flex flex-col gap-8 tablet:flex-row tablet:gap-10">
         {/* Portrait. Shared-element name matches PersonCard's. */}
-        <div className="relative aspect-[4/5] w-32 shrink-0 overflow-hidden rounded-lg bg-muted ring-1 ring-border sm:w-56">
+        <div className="relative aspect-[4/5] w-40 shrink-0 overflow-hidden bg-muted tablet:w-56">
           {profile.photoUrl ? (
             <ViewTransition name={portraitName}>
               <Image
                 src={profile.photoUrl}
                 alt={`Portrait of ${profile.name}`}
                 fill
-                sizes="(min-width: 640px) 224px, 128px"
+                sizes="(min-width: 640px) 224px, 160px"
                 priority
                 className="object-cover"
               />
@@ -160,45 +173,31 @@ export default async function ProfilePage({
           ) : (
             <div
               aria-hidden
-              className="flex size-full items-center justify-center bg-muted text-title font-medium text-muted-foreground"
+              className="flex size-full items-center justify-center text-l font-bold text-muted-foreground"
             >
               {initials(profile.name)}
             </div>
           )}
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-title font-semibold tracking-tight">{profile.name}</h1>
-            <div className="flex flex-wrap items-center gap-1.5 text-small text-muted-foreground">
-              <PartyLabel party={profile.party} color={profile.partyColor} />
-              {meta && <span aria-hidden>·</span>}
-              {meta && <span>{meta}</span>}
-            </div>
-            {profile.fullTitle && profile.fullTitle !== profile.name && (
-              <p className="text-small text-muted-foreground">{profile.fullTitle}</p>
-            )}
-          </div>
-
-          <p className="text-body text-muted-foreground">
-            Chat with an AI persona that answers from {profile.name}&apos;s
-            real speeches in Parliament.
+        <div className="min-w-0 flex-1">
+          <SummaryList rows={rows} className="mb-8" />
+          <p className="mb-6 text-body">
+            Ask {profile.name} a question. Answers are drawn from their real
+            speeches in Parliament.
           </p>
-
-          <div>
-            <ChatCta
-              slug={profile.slug}
-              name={profile.name}
-              memberId={profile.memberId}
-              hasAttribution={profile.popular?.kind === "attribution"}
-            />
-          </div>
-
-          <p className="text-small text-muted-foreground">
-            AI-generated. Not real statements by {profile.name}.
-          </p>
+          <ChatCta
+            slug={profile.slug}
+            name={profile.name}
+            memberId={profile.memberId}
+            hasAttribution={profile.popular?.kind === "attribution"}
+          />
+          <InsetText className="mt-8">
+            Replies are AI-generated. They are not real statements by{" "}
+            {profile.name}.
+          </InsetText>
         </div>
-      </section>
-    </div>
+      </div>
+    </>
   );
 }

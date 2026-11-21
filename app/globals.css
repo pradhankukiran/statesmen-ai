@@ -28,24 +28,29 @@
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
-   Design system: plain and functional
+   Design system: GOV.UK aesthetics
    ─────────────────────────────────────────────────────────────────────────
-   Content first, like a well-made messaging app.
+   Follows the GOV.UK Design System (values from GOV.UK Frontend 6.6.0) for
+   colour, type, spacing, focus and components. It deliberately does NOT use
+   GOV.UK branding: no GDS Transport font (Arial instead, the documented
+   fallback), no crown, no GOV.UK logotype. A phase banner states that this
+   is not a government service.
 
-   Colour  White background, near-black text, neutral greys. Primary actions
-           are near-black. No decorative accent colour; party colours appear
-           only as small dots next to party names.
-   Type    One sans font (Geist). A short, tight scale (title … label). No
-           serif, no italics for decoration, no spaced-out uppercase labels.
-   Shape   Two radii: 6px for controls, 8px for surfaces. Hairline borders,
-           no shadows.
-   Motion  Short and subtle; disabled under prefers-reduced-motion.
+   Colour  Text #0b0c0c, secondary #484949, links #1a65a6, brand blue
+           #1d70b8 for the header bar, green #0f7a52 for actions, red
+           #ca3535 for errors, yellow #ffdd00 only for keyboard focus.
+   Type    Arial. Bold headings. 19px body. Scale: xl 48, l 36, m 24, s/body
+           19, small 16 (smaller on phones, per GOV.UK).
+   Shape   Square corners. 2px black field borders. Buttons sit on a 2px
+           shadow and press down on click.
+   Focus   Yellow background with a black underline (links) or a yellow
+           outline with a black inner border (fields).
    Light mode only. */
 
 @theme inline {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
-  --font-heading: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: Arial, Helvetica, sans-serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -69,69 +74,105 @@
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-hover: var(--brand-hover);
   --color-brand-subtle: var(--brand-subtle);
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+  --color-focus: var(--focus);
+  --color-action: var(--action);
+  --color-action-hover: var(--action-hover);
+  --color-action-shadow: var(--action-shadow);
+  --color-surface: var(--surface);
+  --color-surface-border: var(--surface-border);
 
-  /* Radii: control (6px) and surface (8px). */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.5rem;
-  --radius-2xl: 0.5rem;
+  /* Square corners everywhere. */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
 }
 
 @theme {
-  /* Type scale: size and line height together. */
-  --text-title: 1.5rem;
-  --text-title--line-height: 1.25;
-  --text-heading: 1.125rem;
-  --text-heading--line-height: 1.35;
-  --text-body: 0.9375rem;
-  --text-body--line-height: 1.6;
-  --text-small: 0.8125rem;
-  --text-small--line-height: 1.45;
-  --text-label: 0.75rem;
-  --text-label--line-height: 1.3;
+  /* GOV.UK type scale. Mobile sizes here; desktop sizes applied at 640px
+     via the responsive classes below (text-xl, text-l, text-m). */
+  --text-xl: 2rem;
+  --text-xl--line-height: 1.09375;
+  --text-l: 1.6875rem;
+  --text-l--line-height: 1.111;
+  --text-m: 1.3125rem;
+  --text-m--line-height: 1.19;
+  --text-body: 1.1875rem;
+  --text-body--line-height: 1.3158;
+  --text-small: 1rem;
+  --text-small--line-height: 1.25;
 
-  --ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
-  --default-transition-duration: 150ms;
-  --default-transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  --breakpoint-tablet: 40rem; /* 640px, GOV.UK's tablet breakpoint */
+
+  --default-transition-duration: 0ms;
 }
 
 :root {
   --background: #ffffff;
-  --foreground: #18181b;
+  --foreground: #0b0c0c;
   --card: #ffffff;
-  --card-foreground: #18181b;
+  --card-foreground: #0b0c0c;
   --popover: #ffffff;
-  --popover-foreground: #18181b;
+  --popover-foreground: #0b0c0c;
 
-  --secondary: #f4f4f5;
-  --secondary-foreground: #18181b;
-  --muted: #f4f4f5;
-  --muted-foreground: #63636b; /* 6:1 on white */
-  --accent: #f4f4f5;
-  --accent-foreground: #18181b;
+  --secondary: #f3f3f3;
+  --secondary-foreground: #0b0c0c;
+  --muted: #f3f3f3;
+  --muted-foreground: #484949;
+  --accent: #f3f3f3;
+  --accent-foreground: #0b0c0c;
 
-  /* "brand" is the primary action colour: near-black. */
-  --brand: #18181b;
+  /* Brand blue: header bar, footer rule, notification banners. */
+  --brand: #1d70b8;
   --brand-foreground: #ffffff;
-  --brand-hover: #3f3f46;
-  --brand-subtle: #f4f4f5;
-  --primary: #18181b;
+  --brand-hover: #16548a;
+  --brand-subtle: #d2e2f1;
+
+  --link: #1a65a6;
+  --link-hover: #0f385c;
+  --focus: #ffdd00;
+
+  /* Green: buttons and other primary actions. */
+  --action: #0f7a52;
+  --action-hover: #0b5c3e;
+  --action-shadow: #083d29;
+  --primary: #0f7a52;
   --primary-foreground: #ffffff;
 
-  --destructive: #b42318;
+  /* Light blue surfaces (service navigation, footer). */
+  --surface: #f4f8fb;
+  --surface-border: #8eb8dc;
 
-  --border: #e4e4e7;
-  --input: #d4d4d8;
-  --ring: #18181b;
+  --destructive: #ca3535;
+
+  --border: #cecece;
+  --input: #0b0c0c;
+  --ring: #0b0c0c;
+}
+
+/* Desktop type sizes (GOV.UK large-screen scale). */
+@media (min-width: 40rem) {
+  :root {
+    --text-xl: 3rem;
+    --text-xl--line-height: 1.0417;
+    --text-l: 2.25rem;
+    --text-l--line-height: 1.111;
+    --text-m: 1.5rem;
+    --text-m--line-height: 1.25;
+  }
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-body text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   html {
     @apply font-sans;
@@ -144,5 +185,55 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+/* Link: blue, underlined; darker and thicker underline on hover; GOV.UK
+   yellow focus with a black underline. */
+@utility link {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-thickness: max(1px, 0.0625rem);
+  text-underline-offset: 0.1578em;
+  &:hover {
+    color: var(--link-hover);
+    text-decoration-thickness: max(3px, 0.1875rem, 0.12em);
+  }
+  &:focus-visible {
+    outline: 3px solid transparent;
+    color: var(--foreground);
+    background-color: var(--focus);
+    box-shadow: 0 -2px var(--focus), 0 4px var(--foreground);
+    text-decoration: none;
+  }
+}
+
+/* Focus for boxes (cards, chips): yellow then black ring. */
+@utility focus-box {
+  &:focus-visible {
+    outline: 3px solid transparent;
+    box-shadow: 0 0 0 4px var(--focus), 0 0 0 8px var(--foreground);
+  }
+}
+
+/* Focus for form fields: yellow outline with a black inner border. */
+@utility focus-field {
+  &:focus {
+    outline: 3px solid var(--focus);
+    outline-offset: 0;
+    box-shadow: inset 0 0 0 2px var(--input);
+  }
+}
+
+/* Page container: 960px with 15px gutters (30px from tablet). */
+@utility page-width {
+  width: auto;
+  max-width: 60rem;
+  margin-inline: 15px;
+  @media (min-width: 40rem) {
+    margin-inline: 30px;
+  }
+  @media (min-width: 66.25rem) {
+    margin-inline: auto;
   }
 }

@@ -70,8 +70,8 @@ export default async function BuildPage({
       name = slug;
     }
     return (
-      <div className="lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
-        <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+      <div>
+        <div>
           <BuildProgress slug={slug} name={name} memberId={memberId} />
         </div>
       </div>
@@ -88,8 +88,8 @@ export default async function BuildPage({
       searchTerms: pm.attribution.searchTerms,
     };
     return (
-      <div className="lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
-        <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+      <div>
+        <div>
           <BuildProgress slug={slug} name={pm.name} attribution={attribution} />
         </div>
       </div>
@@ -98,8 +98,8 @@ export default async function BuildPage({
 
   // ─── Fallback: neither path applies ───────────────────────────────────────
   return (
-    <div className="lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
-      <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+    <div>
+      <div>
         <Hero
           headline="This build URL is malformed."
           body="The build URL we received doesn't map to a known persona. Head back to the homepage and pick a Prime Minister to start from."

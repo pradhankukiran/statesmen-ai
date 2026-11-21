@@ -1,30 +1,29 @@
 import * as React from "react"
 
+import { PageHeading } from "@/components/ui/govuk"
 import { cn } from "@/lib/utils"
 
 /**
- * Page heading: a plain title, an optional line of supporting text, and a
- * slot for actions. No eyebrows, no decorative emphasis.
+ * Page intro: heading (with optional caption), a lead paragraph, and a slot
+ * for actions. GOV.UK pattern: heading-l + body-l lead.
  */
 export function Hero({
+  caption,
   headline,
   body,
   children,
   className,
 }: {
+  caption?: React.ReactNode
   headline: React.ReactNode
   body?: React.ReactNode
   children?: React.ReactNode
   className?: string
 }) {
   return (
-    <header className={cn("flex w-full flex-col items-start", className)}>
-      <h1 className="text-title font-semibold tracking-tight text-balance">
-        {headline}
-      </h1>
-      {body ? (
-        <p className="mt-2 max-w-2xl text-body text-muted-foreground">{body}</p>
-      ) : null}
+    <header className={cn("w-full", className)}>
+      <PageHeading caption={caption}>{headline}</PageHeading>
+      {body ? <p className="mt-5 max-w-[40rem] text-m font-normal">{body}</p> : null}
       {children ? <div className="mt-6 w-full">{children}</div> : null}
     </header>
   )

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, MessageSquare } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -108,7 +108,7 @@ export function ChatCta({ slug, name, memberId, hasAttribution }: Props) {
         ? state.result.message
         : null;
   // After an error the user should be able to retry — the button text shifts
-  // from "Chat with X" to "Try again" so the affordance is clear.
+  // from "Start chat" to "Try again" so the affordance is clear.
   const hasRetry = !isBusy && errorMessage !== null;
 
   return (
@@ -135,23 +135,17 @@ export function ChatCta({ slug, name, memberId, hasAttribution }: Props) {
               Checking…
             </>
           ) : hasRetry ? (
-            <>
-              <MessageSquare aria-hidden />
-              Try again
-            </>
+            <>Try again</>
           ) : (
             <>
-              <MessageSquare aria-hidden />
-              Chat with {name}
+              Start chat<span className="sr-only"> with {name}</span>
+              <ArrowRight className="size-6" aria-hidden />
             </>
           )}
         </Button>
       </form>
       {errorMessage ? (
-        <p
-          role="alert"
-          className="rounded-md bg-destructive/5 px-3 py-2 text-xs text-destructive ring-1 ring-inset ring-destructive/20"
-        >
+        <p role="alert" className="text-body font-bold text-destructive">
           {errorMessage}
         </p>
       ) : null}

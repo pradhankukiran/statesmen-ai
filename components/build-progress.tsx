@@ -2,11 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
-
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Hero } from "@/components/hero";
-import { cn } from "@/lib/utils";
+import { ErrorSummary, PageHeading } from "@/components/ui/govuk";
 
 // ─── SSE event shape (mirrors lib/speeches.ts SpeechBuildEvent + route additions)
 
@@ -150,23 +148,23 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
       setLastEventAt(Date.now());
       switch (event.type) {
         case "fetch_start":
-          advance("fetch", "Fetching speeches…");
+          advance("fetch", "Fetch speeches from Hansard");
           break;
         case "fetch_done":
-          advance("fetch", `Found ${event.count} speeches.`);
+          advance("fetch", `Fetch speeches from Hansard (${event.count} found)`);
           break;
         case "embed_progress":
-          advance("embed", "Indexing speeches by meaning…");
+          advance("embed", "Index speeches");
           setEmbedProgress({ done: event.done, total: event.total });
           break;
         case "save_start":
-          advance("save", "Saving…");
+          advance("save", "Save");
           break;
         case "save_done":
-          advance("save", `Saved ${event.count} speeches.`);
+          advance("save", "Save");
           break;
         case "ready":
-          advance("ready", "Done. Opening chat…");
+          advance("ready", "Open chat");
           finalizeAll();
           setPhase("done");
           // A cache hit may be stored under a different slug (same member ID).
@@ -357,151 +355,80 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
   }, [startBuild]);
 
   // ─── Render ────────────────────────────────────────────────────────────────
+  //
+  // GOV.UK task list: one row per step with a status tag on the right.
 
   return (
-    <div className="flex flex-col items-start lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
-      <div className="flex w-full flex-col items-start lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
-        <Hero
-        headline={<>Preparing {name}</>}
-        body="First time only: fetching their speeches from Hansard and indexing them. Usually under a minute."
-      >
-        {phase === "running" || phase === "done" ? (
-          <div className="flex items-center gap-3 text-small text-muted-foreground">
-            <span className="inline-flex items-center gap-2">
-              <span
-                className={cn(
-                  "size-1.5 rounded-full bg-brand",
-                  phase === "running" && "animate-pulse",
-                )}
-                aria-hidden
-              />
-              <span className="font-mono tabular-nums text-foreground">
-                {formatDuration(elapsedMs)}
-              </span>
-              {elapsedMs > 240_000 ? (
-                // 4 min in. Server maxDuration is 300s, so we're close to
-                // the hard ceiling — keep the warning subtle.
-                <span className="text-muted-foreground/80">
-                  · approaching server timeout
-                </span>
-              ) : null}
-            </span>
-          </div>
-        ) : null}
-      </Hero>
+    <div>
+      <PageHeading caption="Preparing a persona">{name}</PageHeading>
+      <p className="mt-5 max-w-[40rem] text-body">
+        This only happens the first time someone chats with {name}. We fetch
+        their speeches from Hansard and index them. It usually takes under a
+        minute.
+      </p>
 
-      {/* Step panel — soft Card-style chrome. */}
-      <ol className="mt-10 flex w-full flex-col divide-y divide-border overflow-hidden rounded-xl bg-card ring-1 ring-border">
+      {phase === "running" || phase === "done" ? (
+        <p className="mt-4 text-body text-muted-foreground" aria-live="polite">
+          Time taken: <span className="font-mono tabular-nums">{formatDuration(elapsedMs)}</span>
+          {elapsedMs > 240_000 ? " (this is taking longer than usual)" : null}
+        </p>
+      ) : null}
+
+      <ul className="mt-8 max-w-[40rem] border-t border-border">
         {steps.length === 0 && phase === "running" ? (
-          <li className="flex items-center gap-3 px-5 py-4 text-sm">
-            <Loader2 className="size-4 shrink-0 animate-spin text-brand" aria-hidden />
-            <span className="text-muted-foreground">Starting…</span>
+          <li className="flex items-center justify-between gap-4 border-b border-border py-[10px] text-body">
+            <span>Starting</span>
+            <Badge variant="blue">In progress</Badge>
           </li>
         ) : null}
-        {steps.map((step) => (
-          <li
-            key={step.id}
-            className="flex flex-col gap-1.5 px-5 py-4"
-            aria-current={step.pending ? "step" : undefined}
-          >
-            <div className="flex items-start gap-3 text-sm">
-              {step.pending ? (
-                <Loader2
-                  className="mt-[3px] size-4 shrink-0 animate-spin text-brand"
-                  aria-hidden
-                />
-              ) : (
-                <CheckCircle2
-                  className="mt-[3px] size-4 shrink-0 text-foreground/70"
-                  aria-hidden
-                />
-              )}
-              <span
-                className={cn(
-                  "min-w-0 flex-1 leading-snug",
-                  step.pending
-                    ? "font-medium text-foreground"
-                    : "text-muted-foreground",
-                )}
-              >
-                {step.text}
-              </span>
-              {step.durationMs !== undefined ? (
-                <span className="shrink-0 font-mono text-label tabular-nums text-muted-foreground">
-                  {formatStepDuration(step.durationMs)}
-                </span>
-              ) : step.pending ? (
-                // Derived from state only — no Date.now() during render.
-                // (build-start-elapsed) - (build-start-to-step-start) =
-                // step-start-elapsed.
-                <span className="shrink-0 font-mono text-label tabular-nums text-muted-foreground">
-                  {formatStepDuration(
+        {steps.map((step) => {
+          const seconds =
+            step.durationMs !== undefined
+              ? formatStepDuration(step.durationMs)
+              : step.pending
+                ? formatStepDuration(
                     Math.max(0, elapsedMs - (step.startedAt - buildStartedAt)),
-                  )}
-                </span>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ol>
+                  )
+                : null;
+          return (
+            <li
+              key={step.id}
+              className="flex items-center justify-between gap-4 border-b border-border py-[10px] text-body"
+              aria-current={step.pending ? "step" : undefined}
+            >
+              <span>
+                {step.text}
+                {seconds ? (
+                  <span className="ml-2 text-small text-muted-foreground">{seconds}</span>
+                ) : null}
+              </span>
+              {step.pending && phase === "running" ? (
+                <Badge variant="blue" className="shrink-0">In progress</Badge>
+              ) : phase === "error" && step.pending ? (
+                <Badge variant="red" className="shrink-0">Failed</Badge>
+              ) : (
+                <Badge variant="green" className="shrink-0">Completed</Badge>
+              )}
+            </li>
+          );
+        })}
+      </ul>
 
-      {/* Progress bar. */}
-      {embedProgress && embedProgress.total > 0 ? (
-        <div className="mt-8 flex w-full flex-col gap-3">
-          <div className="flex items-center justify-between text-small text-muted-foreground">
-            <span>Speeches indexed</span>
-            <span className="font-mono tabular-nums text-foreground">
-              {Math.min(embedProgress.done, embedProgress.total)} /{" "}
-              {embedProgress.total}
-            </span>
-          </div>
-          <div
-            className="h-2 w-full overflow-hidden rounded-full bg-muted"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={embedProgress.total}
-            aria-valuenow={Math.min(embedProgress.done, embedProgress.total)}
-          >
-            <div
-              className="h-full rounded-full bg-brand transition-[width] duration-300"
-              style={{
-                width: `${
-                  (Math.min(embedProgress.done, embedProgress.total) /
-                    embedProgress.total) *
-                  100
-                }%`,
-              }}
-            />
-          </div>
-        </div>
+      {embedProgress && embedProgress.total > 0 && phase === "running" ? (
+        <p className="mt-4 text-body" aria-live="polite">
+          Indexed {Math.min(embedProgress.done, embedProgress.total)} of{" "}
+          {embedProgress.total} speeches
+        </p>
       ) : null}
 
-      {/* Error state. */}
       {phase === "error" ? (
-        <div className="mt-10 flex w-full flex-col gap-5 rounded-xl bg-destructive/5 p-5 ring-1 ring-inset ring-destructive/20 sm:p-6">
-          <div className="flex items-start gap-3">
-            <TriangleAlert
-              className="mt-[3px] size-5 shrink-0 text-destructive"
-              aria-hidden
-            />
-            <div className="flex flex-col gap-1.5">
-              <p className="text-small font-semibold text-destructive">
-                Build failed
-              </p>
-              <p className="text-body text-foreground">
-                {errorMessage ?? "Unknown error."}
-              </p>
-            </div>
-          </div>
-          <div>
-            <Button variant="primary" size="lg" onClick={handleRetry}>
-              <RefreshCw aria-hidden />
-              Try again
-            </Button>
-          </div>
-        </div>
+        <ErrorSummary title="The persona could not be prepared" className="mt-8 max-w-[40rem]">
+          <p className="mb-5">{errorMessage ?? "Unknown error."}</p>
+          <Button variant="secondary" onClick={handleRetry}>
+            Try again
+          </Button>
+        </ErrorSummary>
       ) : null}
-      </div>
     </div>
   );
 }

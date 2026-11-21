@@ -4,25 +4,26 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-// Badge: small plain-text tag. neutral (grey fill), outline (border only),
-// destructive (red tint).
+// GOV.UK tag: short status label on a tinted background.
 const badgeVariants = cva(
-  "inline-flex h-5 w-fit shrink-0 items-center gap-1 rounded-sm px-1.5 text-label font-medium whitespace-nowrap [&>svg]:size-3",
+  "inline-block max-w-40 px-2 pt-0.5 pb-[3px] text-small font-normal break-words",
   {
     variants: {
       variant: {
-        neutral: "bg-muted text-muted-foreground",
-        outline: "text-muted-foreground ring-1 ring-inset ring-border",
-        destructive: "bg-destructive/10 text-destructive",
+        blue: "bg-[#d2e2f1] text-[#0f385c]",
+        grey: "bg-[#cecece] text-foreground",
+        green: "bg-[#cfe4dc] text-[#083d29]",
+        red: "bg-[#f4d7d7] text-[#651b1b]",
+        yellow: "bg-[#fff8cc] text-[#806f00]",
       },
     },
-    defaultVariants: { variant: "neutral" },
+    defaultVariants: { variant: "blue" },
   }
 )
 
 function Badge({
   className,
-  variant = "neutral",
+  variant = "blue",
   render,
   ...props
 }: useRender.ComponentProps<"span"> & VariantProps<typeof badgeVariants>) {

@@ -1,21 +1,24 @@
 import { PersonCard } from "@/components/person-card";
+import { PageHeading } from "@/components/ui/govuk";
 import { getPopularPMs, popularPhotoUrl } from "@/lib/popular";
 
 export default function Home() {
   const popular = getPopularPMs();
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-8 lg:h-full lg:overflow-y-auto">
-      <h1 className="text-title font-semibold tracking-tight">
-        Chat with British politicians
-      </h1>
-      <p className="mt-1 max-w-2xl text-body text-muted-foreground">
-        Each one answers from their real speeches in Parliament. Pick a Prime
-        Minister below, or search for any MP or Lord.
+    <>
+      <PageHeading size="xl">Chat with British politicians</PageHeading>
+      <p className="mt-5 max-w-[40rem] text-m">
+        Ask a politician a question and get an answer drawn from their real
+        speeches in Parliament.
+      </p>
+      <p className="mt-4 max-w-[40rem] text-body">
+        Choose a Prime Minister below, or use the search at the top of the
+        page to find any MP or Lord.
       </p>
 
-      <h2 className="mt-8 mb-3 text-heading font-semibold">Prime Ministers</h2>
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+      <h2 className="mt-10 mb-5 text-l font-bold">Prime Ministers</h2>
+      <ul className="grid grid-cols-2 gap-x-5 gap-y-8 tablet:grid-cols-4 lg:grid-cols-7">
         {popular.map((pm) => (
           <li key={pm.slug}>
             <PersonCard
@@ -30,6 +33,6 @@ export default function Home() {
           </li>
         ))}
       </ul>
-    </div>
+    </>
   );
 }

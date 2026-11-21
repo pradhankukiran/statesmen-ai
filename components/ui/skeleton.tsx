@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils"
 
-/** Loading placeholder in the warm neutral. */
+/** Loading placeholder. */
 function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="skeleton"
-      className={cn("animate-pulse rounded-sm bg-muted", className)}
+      className={cn("animate-pulse bg-muted", className)}
       {...props}
     />
   )

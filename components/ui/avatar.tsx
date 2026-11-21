@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 //
 // A single avatar primitive used everywhere a person needs a face: the chat
 // header, assistant message bubbles, and (via wrappers) profile thumbnails.
-// Falls back to initials on grey when no photo is available.
+// Square, like GOV.UK portraits. Falls back to initials on grey.
 //
 // Sizes are deliberate, not arbitrary:
 //   sm  ─ assistant message bubble gutter (32px)
@@ -46,10 +46,10 @@ const SIZE_PX: Record<AvatarSize, number> = {
 }
 
 const SIZE_TEXT: Record<AvatarSize, string> = {
-  sm: "text-[11px]",
-  md: "text-xs",
-  lg: "text-sm",
-  xl: "text-2xl",
+  sm: "text-xs",
+  md: "text-sm",
+  lg: "text-small",
+  xl: "text-l",
 }
 
 function initials(name: string): string {
@@ -75,7 +75,7 @@ export function Avatar({
   return (
     <div
       className={cn(
-        "shrink-0 overflow-hidden rounded-full ring-1 ring-border",
+        "shrink-0 overflow-hidden",
         dim,
         hasPhoto ? "bg-muted" : "bg-muted text-muted-foreground",
         !hasPhoto && fallbackClassName,

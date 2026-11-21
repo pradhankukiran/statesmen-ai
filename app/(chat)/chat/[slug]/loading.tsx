@@ -1,32 +1,33 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-/** Mirrors the chat layout: header, centred empty state, message box. */
+/** Mirrors the chat layout. */
 export default function ChatLoading() {
   return (
     <div className="flex h-full flex-col">
+      <div className="h-10 shrink-0 bg-brand" />
       <div className="shrink-0 border-b border-border">
-        <div className="mx-auto flex h-16 w-full max-w-3xl items-center gap-3 px-4 sm:px-6">
-          <Skeleton className="size-8" />
-          <Skeleton className="size-10 rounded-full" />
-          <div className="flex flex-1 flex-col gap-1.5">
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-3 w-56" />
+        <div className="page-width py-4">
+          <Skeleton className="h-5 w-28" />
+          <div className="mt-3 flex items-center gap-3">
+            <Skeleton className="size-14" />
+            <div className="flex flex-col gap-1.5">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-6 w-56" />
+            </div>
           </div>
         </div>
       </div>
-      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center gap-6 px-4 sm:px-6">
-        <Skeleton className="size-24 rounded-full" />
-        <Skeleton className="h-8 w-72" />
-        <Skeleton className="h-4 w-80" />
-        <div className="grid w-full gap-2 sm:grid-cols-2">
-          {Array.from({ length: 4 }, (_, i) => (
-            <Skeleton key={i} className="h-12 rounded-lg" />
-          ))}
-        </div>
-      </div>
+      <div className="flex-1"><div className="page-width py-6">
+        <Skeleton className="h-5 w-full max-w-[40rem]" />
+        <Skeleton className="mt-6 h-5 w-32" />
+        {Array.from({ length: 4 }, (_, i) => (
+          <Skeleton key={i} className="mt-3 h-5 w-80" />
+        ))}
+      </div></div>
       <div className="shrink-0 border-t border-border">
-        <div className="mx-auto w-full max-w-3xl px-4 py-3 sm:px-6">
-          <Skeleton className="h-14 rounded-lg" />
+        <div className="page-width py-3">
+          <Skeleton className="h-5 w-56" />
+          <Skeleton className="mt-2 h-12 w-full max-w-[40rem]" />
         </div>
       </div>
     </div>
