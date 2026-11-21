@@ -6,7 +6,7 @@
  * events to the build page.
  */
 
-import { revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import type { FetchConfig } from "@/lib/collect";
 import { personTag } from "@/lib/person-cache";
@@ -360,8 +360,10 @@ export async function POST(request: Request): Promise<Response> {
           });
 
           // A rebuilt person's cached details (name, speech count, era) are
-          // stale now; expire them immediately.
+          // stale now; expire them immediately. The chat page is statically
+          // cached too, and may hold a "not built yet" redirect: refresh it.
           revalidateTag(personTag(slug), { expire: 0 });
+          revalidatePath(`/chat/${slug}`);
           // Keeps the header status dot honest; runs after the response ends.
           after(recordEmbedActivity);
           send({

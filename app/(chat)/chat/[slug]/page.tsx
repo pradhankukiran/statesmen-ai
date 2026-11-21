@@ -4,7 +4,21 @@ import type { Metadata } from "next";
 import { ChatWindow } from "@/components/chat-window";
 import { getPersonCached } from "@/lib/person-cache";
 import { getMemberPhotoUrl } from "@/lib/members";
-import { getPopularPMBySlug, photoUrlForMember } from "@/lib/popular";
+import { getPopularPMs, getPopularPMBySlug, photoUrlForMember } from "@/lib/popular";
+
+// ─── Static generation (ISR) ──────────────────────────────────────────────────
+//
+// Chat pages are rendered once and served from Vercel's edge cache, like the
+// home page, instead of being rendered in us-east on every visit. Featured
+// people are pre-rendered at deploy; anyone else on first visit. Pages refresh
+// hourly, and the build route refreshes a page as soon as its person is built.
+
+export const revalidate = 3600;
+export const dynamicParams = true;
+
+export function generateStaticParams(): { slug: string }[] {
+  return getPopularPMs().map((pm) => ({ slug: pm.slug }));
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
