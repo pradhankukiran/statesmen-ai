@@ -1,3 +1,9 @@
+> **Historical document.** This is the original May 2026 plan. The app has
+> since changed substantially: OpenRouter, Vercel Blob and the LLM
+> extract/merge pipeline were replaced by Modal embeddings, Neon with
+> pgvector and retrieval at chat time. See [README.md](./README.md) for the
+> current design.
+
 # Statesmen AI — Project Plan
 
 > An app to chat with AI personas of British political figures, generated on demand from real Hansard speeches.
