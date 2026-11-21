@@ -6,8 +6,10 @@
  * events to the build page.
  */
 
+import { revalidateTag } from "next/cache";
 import { after } from "next/server";
 import type { FetchConfig } from "@/lib/collect";
+import { personTag } from "@/lib/person-cache";
 import { recordEmbedActivity } from "@/lib/warmup-state";
 import {
   buildSpeechIndex,
@@ -357,6 +359,9 @@ export async function POST(request: Request): Promise<Response> {
             signal: compositeSignal,
           });
 
+          // A rebuilt person's cached details (name, speech count, era) are
+          // stale now; expire them immediately.
+          revalidateTag(personTag(slug), { expire: 0 });
           // Keeps the header status dot honest; runs after the response ends.
           after(recordEmbedActivity);
           send({

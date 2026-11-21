@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import { ChatWindow } from "@/components/chat-window";
-import { getPerson } from "@/lib/speeches";
+import { getPersonCached } from "@/lib/person-cache";
 import { getMemberPhotoUrl } from "@/lib/members";
 import { getPopularPMBySlug, photoUrlForMember } from "@/lib/popular";
 
@@ -35,7 +35,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const person = await getPerson(slug);
+    const person = await getPersonCached(slug);
     if (person === null) return { title: "Chat — Statesmen AI" };
     return {
       title: `Chat with ${person.name} — Statesmen AI`,
@@ -55,7 +55,7 @@ export default async function ChatPage({
 }) {
   const { slug } = await params;
 
-  const person = await getPerson(slug);
+  const person = await getPersonCached(slug);
   if (person === null) {
     // Not built yet. Featured people (home cards link straight here) go to
     // their build page; anything else goes home.

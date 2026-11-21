@@ -16,7 +16,8 @@ import {
 } from "ai";
 import { chatModel } from "@/lib/models";
 import { recordEmbedActivity } from "@/lib/warmup-state";
-import { getPerson, searchSpeeches, type StoredPerson } from "@/lib/speeches";
+import { getPersonCached } from "@/lib/person-cache";
+import { searchSpeeches, type StoredPerson } from "@/lib/speeches";
 import {
   buildChatSystemPrompt,
   retrievalQuery,
@@ -197,7 +198,7 @@ export async function POST(request: Request): Promise<Response> {
 
   let person: StoredPerson | null;
   try {
-    person = await getPerson(slug);
+    person = await getPersonCached(slug);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error.";
     return Response.json(
