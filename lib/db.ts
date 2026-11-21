@@ -1,0 +1,50 @@
+/**
+ * Neon Postgres access.
+ *
+ * Uses the WebSocket `Pool` from @neondatabase/serverless so writes can run
+ * inside a real transaction. A pool is opened per call and closed after, which
+ * is the pattern Neon recommends for serverless functions (no connection is
+ * held between invocations).
+ */
+
+import { Pool, type PoolClient } from "@neondatabase/serverless";
+
+function databaseUrl(): string {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) throw new Error("DATABASE_URL is not set.");
+  return url;
+}
+
+/** Run `fn` with a connected client, closing the pool afterwards. */
+export async function withDb<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const pool = new Pool({ connectionString: databaseUrl() });
+  const client = await pool.connect();
+  try {
+    return await fn(client);
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+/** Run `fn` inside BEGIN / COMMIT, rolling back on any error. */
+export async function withTransaction<T>(
+  fn: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  return withDb(async (client) => {
+    await client.query("BEGIN");
+    try {
+      const result = await fn(client);
+      await client.query("COMMIT");
+      return result;
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw err;
+    }
+  });
+}
+
+/** pgvector text form: "[0.1,0.2,...]". */
+export function toVectorLiteral(v: number[]): string {
+  return `[${v.join(",")}]`;
+}

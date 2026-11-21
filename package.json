@@ -9,13 +9,15 @@
     "lint": "eslint",
     "script:fetch": "tsx scripts/test-fetch.ts",
     "script:extract": "tsx scripts/test-extract.ts",
-    "script:build": "tsx scripts/test-build.ts"
+    "script:build": "tsx scripts/test-build.ts",
+    "script:speeches": "tsx scripts/test-speech-build.ts"
   },
   "dependencies": {
     "@ai-sdk/groq": "^3.0.38",
     "@ai-sdk/openai-compatible": "^2.0.47",
     "@ai-sdk/react": "^3.0.177",
     "@base-ui/react": "^1.4.1",
+    "@neondatabase/serverless": "^1.2.1",
     "@openrouter/ai-sdk-provider": "^2.9.0",
     "@vercel/blob": "^2.3.3",
     "ai": "^6.0.175",

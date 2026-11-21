@@ -40,6 +40,8 @@ export type Contribution = {
   date: string; // ISO date string
   text: string; // cleaned plain text
   debateSection: string | null;
+  /** Hansard DebateSectionExtId, for linking to the debate. */
+  debateSectionExtId: string | null;
   house: string;
 };
 
@@ -104,6 +106,7 @@ function toContribution(r: z.infer<typeof ContributionRawSchema>): Contribution 
     date: r.SittingDate,
     text,
     debateSection: r.DebateSection ?? null,
+    debateSectionExtId: r.DebateSectionExtId ?? null,
     house: r.House,
   };
 }
