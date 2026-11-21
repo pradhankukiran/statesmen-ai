@@ -11,7 +11,7 @@
 import type { Contribution } from "./hansard";
 import { collectContributions, type FetchConfig } from "./collect";
 import { EMBED_MODEL, embedDocuments, embedQuery } from "./embed";
-import { toVectorLiteral, withDb, withTransaction } from "./db";
+import { query, toVectorLiteral, withTransaction } from "./db";
 import { getCareerDates } from "./members";
 
 /** Same floor as the old persona build: below this a persona isn't faithful. */
@@ -186,13 +186,8 @@ function toStoredPerson(r: Record<string, unknown>): StoredPerson {
 
 /** A built person by slug (the /chat URL segment), or null. */
 export async function getPerson(slug: string): Promise<StoredPerson | null> {
-  return withDb(async (db) => {
-    const { rows } = await db.query(
-      `SELECT ${PERSON_COLUMNS} FROM persons WHERE slug = $1`,
-      [slug],
-    );
-    return rows[0] ? toStoredPerson(rows[0]) : null;
-  });
+  const rows = await query(`SELECT ${PERSON_COLUMNS} FROM persons WHERE slug = $1`, [slug]);
+  return rows[0] ? toStoredPerson(rows[0]) : null;
 }
 
 /**
@@ -204,22 +199,17 @@ export async function findPerson(key: {
   slug: string;
   memberId?: number | null;
 }): Promise<StoredPerson | null> {
-  return withDb(async (db) => {
-    const { rows } =
-      key.memberId != null
-        ? await db.query(
-            `SELECT ${PERSON_COLUMNS} FROM persons
-              WHERE member_id = $1 OR slug = $2
-              ORDER BY (member_id = $1) DESC
-              LIMIT 1`,
-            [key.memberId, key.slug],
-          )
-        : await db.query(
-            `SELECT ${PERSON_COLUMNS} FROM persons WHERE slug = $1`,
-            [key.slug],
-          );
-    return rows[0] ? toStoredPerson(rows[0]) : null;
-  });
+  const rows =
+    key.memberId != null
+      ? await query(
+          `SELECT ${PERSON_COLUMNS} FROM persons
+            WHERE member_id = $1 OR slug = $2
+            ORDER BY (member_id = $1) DESC
+            LIMIT 1`,
+          [key.memberId, key.slug],
+        )
+      : await query(`SELECT ${PERSON_COLUMNS} FROM persons WHERE slug = $1`, [key.slug]);
+  return rows[0] ? toStoredPerson(rows[0]) : null;
 }
 
 export type SpeechMatch = {
@@ -241,24 +231,22 @@ export async function searchSpeeches(
   opts: { signal?: AbortSignal } = {},
 ): Promise<SpeechMatch[]> {
   const q = toVectorLiteral(await embedQuery(question, opts));
-  return withDb(async (db) => {
-    const { rows } = await db.query(
-      `SELECT id, sitting_date::text AS sitting_date, house, debate_title,
-              debate_section_ext_id, text, 1 - (embedding <=> $2::vector) AS similarity
-         FROM speeches
-        WHERE person_slug = $1
-        ORDER BY embedding <=> $2::vector
-        LIMIT $3`,
-      [slug, q, limit],
-    );
-    return rows.map((r) => ({
-      id: r.id,
-      sittingDate: r.sitting_date,
-      house: r.house,
-      debateTitle: r.debate_title,
-      debateSectionExtId: r.debate_section_ext_id,
-      text: r.text,
-      similarity: Number(r.similarity),
-    }));
-  });
+  const rows = await query<Record<string, string>>(
+    `SELECT id, sitting_date::text AS sitting_date, house, debate_title,
+            debate_section_ext_id, text, 1 - (embedding <=> $2::vector) AS similarity
+       FROM speeches
+      WHERE person_slug = $1
+      ORDER BY embedding <=> $2::vector
+      LIMIT $3`,
+    [slug, q, limit],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    sittingDate: r.sitting_date,
+    house: r.house,
+    debateTitle: r.debate_title,
+    debateSectionExtId: r.debate_section_ext_id,
+    text: r.text,
+    similarity: Number(r.similarity),
+  }));
 }

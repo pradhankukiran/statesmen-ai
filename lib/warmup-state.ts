@@ -13,7 +13,7 @@
  * them and must never fail because of a status-dot write.
  */
 
-import { withDb } from "./db";
+import { query } from "./db";
 
 // ─── Public constants ─────────────────────────────────────────────────────────
 
@@ -36,17 +36,15 @@ const SERVICE = "embed";
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function getWarmupState(): Promise<WarmupState> {
-  const row = await withDb(async (db) => {
-    const { rows } = await db.query(
-      `SELECT (extract(epoch FROM last_warm_at) * 1000)::bigint AS last_warm_at,
-              (extract(epoch FROM warming_started_at) * 1000)::bigint AS warming_started_at
-         FROM service_state WHERE name = $1`,
-      [SERVICE],
-    );
-    return rows[0] as
-      | { last_warm_at: string | null; warming_started_at: string | null }
-      | undefined;
-  });
+  const [row] = await query<{
+    last_warm_at: string | null;
+    warming_started_at: string | null;
+  }>(
+    `SELECT (extract(epoch FROM last_warm_at) * 1000)::bigint AS last_warm_at,
+            (extract(epoch FROM warming_started_at) * 1000)::bigint AS warming_started_at
+       FROM service_state WHERE name = $1`,
+    [SERVICE],
+  );
 
   const lastWarmAt = row?.last_warm_at != null ? Number(row.last_warm_at) : null;
   const warmingStartedAt =
@@ -77,14 +75,12 @@ export async function getWarmupState(): Promise<WarmupState> {
 /** Stamp a successful call to the embedding service. Never throws. */
 export async function recordEmbedActivity(): Promise<void> {
   try {
-    await withDb((db) =>
-      db.query(
-        `INSERT INTO service_state (name, last_warm_at, warming_started_at)
-         VALUES ($1, now(), NULL)
-         ON CONFLICT (name) DO UPDATE
-           SET last_warm_at = now(), warming_started_at = NULL`,
-        [SERVICE],
-      ),
+    await query(
+      `INSERT INTO service_state (name, last_warm_at, warming_started_at)
+       VALUES ($1, now(), NULL)
+       ON CONFLICT (name) DO UPDATE
+         SET last_warm_at = now(), warming_started_at = NULL`,
+      [SERVICE],
     );
   } catch (err) {
     console.error(
@@ -97,13 +93,11 @@ export async function recordEmbedActivity(): Promise<void> {
 /** Stamp the start of an explicit warmup. Never throws. */
 export async function recordWarmupStarted(): Promise<void> {
   try {
-    await withDb((db) =>
-      db.query(
-        `INSERT INTO service_state (name, warming_started_at)
-         VALUES ($1, now())
-         ON CONFLICT (name) DO UPDATE SET warming_started_at = now()`,
-        [SERVICE],
-      ),
+    await query(
+      `INSERT INTO service_state (name, warming_started_at)
+       VALUES ($1, now())
+       ON CONFLICT (name) DO UPDATE SET warming_started_at = now()`,
+      [SERVICE],
     );
   } catch (err) {
     console.error(

@@ -1,18 +1,30 @@
 /**
- * Neon Postgres access.
+ * Neon Postgres access, two ways:
  *
- * Uses the WebSocket `Pool` from @neondatabase/serverless so writes can run
- * inside a real transaction. A pool is opened per call and closed after, which
- * is the pattern Neon recommends for serverless functions (no connection is
- * held between invocations).
+ *   query()          HTTP: one request per query, no connection setup. Use
+ *                    for single reads and writes (page loads, chat search,
+ *                    status checks). Measured ~4x faster than a fresh
+ *                    WebSocket connection for a one-row lookup.
+ *   withTransaction  WebSocket Pool: a real session for multi-statement
+ *                    transactions (the speech build's save). Opened per call
+ *                    and closed after, as Neon recommends for serverless.
  */
 
-import { Pool, type PoolClient } from "@neondatabase/serverless";
+import { neon, Pool, type PoolClient } from "@neondatabase/serverless";
 
 function databaseUrl(): string {
   const url = process.env.DATABASE_URL?.trim();
   if (!url) throw new Error("DATABASE_URL is not set.");
   return url;
+}
+
+/** Run one parameterised query over HTTP and return its rows. */
+export async function query<T extends Record<string, unknown>>(
+  text: string,
+  params: unknown[] = [],
+): Promise<T[]> {
+  const sql = neon(databaseUrl());
+  return (await sql.query(text, params)) as T[];
 }
 
 /** Run `fn` with a connected client, closing the pool afterwards. */
