@@ -24,7 +24,16 @@ export function SiteFooter() {
           >
             Open Parliament Licence v3.0
           </a>
-          .{credits.length > 0 && <> Photos: {credits.join(" · ")}.</>}
+          . Official portraits © UK Parliament, licensed under{" "}
+          <a
+            href="https://creativecommons.org/licenses/by/3.0/"
+            target="_blank"
+            rel="noreferrer"
+            className="link"
+          >
+            CC BY 3.0
+          </a>
+          .{credits.length > 0 && <> Other photos: {credits.join(" · ")}.</>}
         </p>
       </div>
     </footer>
