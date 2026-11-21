@@ -47,7 +47,7 @@ const markdownComponents: Components = {
 // Memoised so streaming only re-parses the reply that is growing.
 const ReplyMarkdown = memo(function ReplyMarkdown({ text }: { text: string }) {
   return (
-    <div className="prose prose-neutral max-w-none text-body text-foreground prose-p:my-3 first:prose-p:mt-0 last:prose-p:mb-0 prose-a:text-brand prose-blockquote:border-l-brand prose-blockquote:font-serif prose-headings:font-heading prose-headings:font-medium prose-h1:text-subheading prose-h2:text-subheading prose-h3:text-body">
+    <div className="prose prose-neutral max-w-none text-body text-foreground prose-p:my-3 first:prose-p:mt-0 last:prose-p:mb-0 prose-a:text-foreground prose-blockquote:font-normal prose-blockquote:not-italic prose-headings:font-semibold prose-h1:text-heading prose-h2:text-heading prose-h3:text-body">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {text}
       </ReactMarkdown>
@@ -136,7 +136,7 @@ export function ChatWindow({ slug, name, photoUrl, subtitle, suggestedStarters }
           </Button>
           <Avatar name={name} src={photoUrl} size="md" loading="eager" />
           <div className="flex min-w-0 flex-1 flex-col">
-            <h1 className="truncate font-heading text-subheading font-medium leading-tight">
+            <h1 className="truncate text-body font-semibold leading-tight">
               {name}
             </h1>
             {subtitle && (
@@ -243,7 +243,6 @@ export function ChatWindow({ slug, name, photoUrl, subtitle, suggestedStarters }
 
 function EmptyState({
   name,
-  photoUrl,
   starters,
   onStarter,
 }: {
@@ -253,22 +252,15 @@ function EmptyState({
   onStarter: (s: string) => void;
 }) {
   return (
-    <div className="my-auto flex flex-col items-center gap-8 py-8 text-center">
-      <Avatar name={name} src={photoUrl} size="xl" loading="eager" />
-      <div className="flex flex-col items-center gap-3">
-        <h2 className="text-balance font-heading text-title font-medium">
-          Ask {name} anything
-        </h2>
-        <p className="max-w-md text-body text-muted-foreground">
-          Answers are drawn from their real speeches in Parliament.
-        </p>
-      </div>
-      <ul className="grid w-full gap-2 sm:grid-cols-2">
+    <div className="mt-auto flex flex-col gap-3">
+      <p className="text-small text-muted-foreground">
+        Ask {name} anything. Replies are drawn from their real speeches in
+        Parliament. Some ideas:
+      </p>
+      <ul className="flex flex-col gap-1.5">
         {starters.map((starter) => (
-          <li key={starter} className="flex">
-            <StarterChip className="w-full" onClick={() => onStarter(starter)}>
-              {starter}
-            </StarterChip>
+          <li key={starter}>
+            <StarterChip onClick={() => onStarter(starter)}>{starter}</StarterChip>
           </li>
         ))}
       </ul>

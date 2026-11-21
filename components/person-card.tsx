@@ -52,33 +52,29 @@ function initials(name: string): string {
   return `${first}${last}`.toUpperCase();
 }
 
-/** Portrait card: photo, serif name, party dot, house and term, tagline. */
+/** Portrait card: photo, name, party dot and years. */
 export function PersonCard({
   id,
   name,
   party,
   partyColor,
-  house,
   term,
   startedAt,
   endedAt,
-  tagline,
   photoUrl,
   href,
   className,
 }: PersonCardProps) {
   const src =
     photoUrl ?? (typeof id === "number" ? getMemberPhotoUrl(id) : null);
-  const meta = [house, deriveTerm(term, startedAt, endedAt)]
-    .filter(Boolean)
-    .join(" · ");
+  const years = deriveTerm(term, startedAt, endedAt);
 
   return (
     <Link
       href={href ?? `/p/${id}`}
       aria-label={`Open ${name}`}
       className={cn(
-        "group flex h-full flex-col overflow-hidden rounded-lg bg-card ring-1 ring-border outline-none transition-shadow hover:ring-input focus-visible:ring-2 focus-visible:ring-brand",
+        "group flex h-full flex-col overflow-hidden rounded-lg bg-card ring-1 ring-border outline-none transition-shadow hover:ring-input focus-visible:ring-2 focus-visible:ring-ring",
         className,
       )}
     >
@@ -97,21 +93,20 @@ export function PersonCard({
         ) : (
           <div
             aria-hidden
-            className="flex size-full items-center justify-center bg-brand-subtle font-serif text-title text-brand"
+            className="flex size-full items-center justify-center bg-muted text-title font-medium text-muted-foreground"
           >
             {initials(name)}
           </div>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-1 p-3">
-        <div className="font-heading text-subheading font-medium">{name}</div>
-        <PartyLabel party={party ?? null} color={partyColor} />
-        {meta && <div className="text-small text-muted-foreground">{meta}</div>}
-        {tagline && (
-          <div className="mt-auto pt-1 font-serif text-small italic text-muted-foreground">
-            {tagline}
-          </div>
-        )}
+      <div className="flex flex-1 flex-col gap-0.5 p-3">
+        <div className="text-body font-medium leading-snug">{name}</div>
+        <PartyLabel
+          party={party ?? null}
+          color={partyColor}
+          className="text-small text-muted-foreground"
+        />
+        {years && <div className="text-small text-muted-foreground">{years}</div>}
       </div>
     </Link>
   );

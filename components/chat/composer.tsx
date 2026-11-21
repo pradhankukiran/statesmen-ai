@@ -56,7 +56,7 @@ export function Composer({
     <form
       onSubmit={handleSubmit}
       className={cn(
-        "flex items-end gap-2 rounded-lg bg-card p-2 ring-1 ring-input transition-shadow focus-within:ring-2 focus-within:ring-brand",
+        "flex items-end gap-2 rounded-lg bg-card p-1.5 ring-1 ring-input transition-shadow focus-within:ring-foreground/40",
         className,
       )}
     >

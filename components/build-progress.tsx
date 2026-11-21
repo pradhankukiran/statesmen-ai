@@ -362,17 +362,11 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
     <div className="flex flex-col items-start lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
       <div className="flex w-full flex-col items-start lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
         <Hero
-        eyebrow="Building persona"
-        headline={<>Building {name}…</>}
-        body="This only happens once. After that, chat is instant for everyone. We fetch their speeches from Hansard and index them by meaning. Builds usually take under a minute."
-        bodyMaxWidth="max-w-none"
+        headline={<>Preparing {name}</>}
+        body="First time only: fetching their speeches from Hansard and indexing them. Usually under a minute."
       >
         {phase === "running" || phase === "done" ? (
-          <div className="flex items-center gap-3 text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            <span>Cold build</span>
-            <span aria-hidden className="text-foreground/30">
-              ·
-            </span>
+          <div className="flex items-center gap-3 text-small text-muted-foreground">
             <span className="inline-flex items-center gap-2">
               <span
                 className={cn(
@@ -381,7 +375,6 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
                 )}
                 aria-hidden
               />
-              Elapsed
               <span className="font-mono tabular-nums text-foreground">
                 {formatDuration(elapsedMs)}
               </span>
@@ -434,14 +427,14 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
                 {step.text}
               </span>
               {step.durationMs !== undefined ? (
-                <span className="shrink-0 font-mono text-[0.6875rem] tabular-nums text-muted-foreground">
+                <span className="shrink-0 font-mono text-label tabular-nums text-muted-foreground">
                   {formatStepDuration(step.durationMs)}
                 </span>
               ) : step.pending ? (
                 // Derived from state only — no Date.now() during render.
                 // (build-start-elapsed) - (build-start-to-step-start) =
                 // step-start-elapsed.
-                <span className="shrink-0 font-mono text-[0.6875rem] tabular-nums text-muted-foreground">
+                <span className="shrink-0 font-mono text-label tabular-nums text-muted-foreground">
                   {formatStepDuration(
                     Math.max(0, elapsedMs - (step.startedAt - buildStartedAt)),
                   )}
@@ -452,10 +445,10 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
         ))}
       </ol>
 
-      {/* Progress bar — soft track, brand-yellow fill. */}
+      {/* Progress bar. */}
       {embedProgress && embedProgress.total > 0 ? (
         <div className="mt-8 flex w-full flex-col gap-3">
-          <div className="flex items-center justify-between text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <div className="flex items-center justify-between text-small text-muted-foreground">
             <span>Speeches indexed</span>
             <span className="font-mono tabular-nums text-foreground">
               {Math.min(embedProgress.done, embedProgress.total)} /{" "}
@@ -492,10 +485,10 @@ export function BuildProgress({ slug, name, memberId, attribution }: Props) {
               aria-hidden
             />
             <div className="flex flex-col gap-1.5">
-              <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-destructive">
+              <p className="text-small font-semibold text-destructive">
                 Build failed
               </p>
-              <p className="text-sm text-foreground sm:text-base">
+              <p className="text-body text-foreground">
                 {errorMessage ?? "Unknown error."}
               </p>
             </div>

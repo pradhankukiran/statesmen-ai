@@ -304,7 +304,7 @@ function Results({
       {pendingQuery ? (
         <div
           aria-live="polite"
-          className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-[0.6875rem]"
+          className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-label"
         >
           <Badge variant="outline" className="font-normal">
             Searching “{pendingQuery}”…
@@ -318,7 +318,7 @@ function Results({
         ))}
       </ul>
       {total > items.length ? (
-        <div className="border-t border-border px-3 py-2 text-[0.6875rem] text-muted-foreground">
+        <div className="border-t border-border px-3 py-2 text-label text-muted-foreground">
           Showing {items.length} of {total}
         </div>
       ) : null}
@@ -359,7 +359,7 @@ function ResultRow({
           ) : (
             <span
               aria-hidden
-              className="flex h-full w-full items-center justify-center bg-brand-subtle font-serif text-small text-brand"
+              className="flex h-full w-full items-center justify-center bg-muted text-small font-medium text-muted-foreground"
             >
               {initials(name)}
             </span>

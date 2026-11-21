@@ -101,10 +101,8 @@ export default async function BuildPage({
     <div className="lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
       <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
         <Hero
-          eyebrow="Malformed URL"
           headline="This build URL is malformed."
           body="The build URL we received doesn't map to a known persona. Head back to the homepage and pick a Prime Minister to start from."
-          bodyMaxWidth="max-w-none"
         >
           <Button variant="primary" size="lg" render={<Link href="/" />}>
             Return to homepage

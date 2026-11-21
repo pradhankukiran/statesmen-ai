@@ -4,27 +4,19 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-// Badge: small uppercase label pill.
-//   accent      ─ Green tint. Section eyebrows ("Begin conversation").
-//   neutral     ─ Warm grey. Counts and metadata.
-//   outline     ─ Border only. Inline tags.
-//   lords       ─ Lords red tint. Marks House of Lords members.
-//   destructive ─ Red tint. Inline errors.
+// Badge: small plain-text tag. neutral (grey fill), outline (border only),
+// destructive (red tint).
 const badgeVariants = cva(
-  "eyebrow inline-flex h-6 w-fit shrink-0 items-center justify-center gap-1 rounded-sm px-2 whitespace-nowrap [&>svg]:pointer-events-none [&>svg]:size-3",
+  "inline-flex h-5 w-fit shrink-0 items-center gap-1 rounded-sm px-1.5 text-label font-medium whitespace-nowrap [&>svg]:size-3",
   {
     variants: {
       variant: {
-        accent: "bg-brand-subtle text-brand",
         neutral: "bg-muted text-muted-foreground",
         outline: "text-muted-foreground ring-1 ring-inset ring-border",
-        lords: "bg-lords-subtle text-lords",
         destructive: "bg-destructive/10 text-destructive",
       },
     },
-    defaultVariants: {
-      variant: "neutral",
-    },
+    defaultVariants: { variant: "neutral" },
   }
 )
 
@@ -37,16 +29,11 @@ function Badge({
   return useRender({
     defaultTagName: "span",
     props: mergeProps<"span">(
-      {
-        className: cn(badgeVariants({ variant }), className),
-      },
+      { className: cn(badgeVariants({ variant }), className) },
       props
     ),
     render,
-    state: {
-      slot: "badge",
-      variant,
-    },
+    state: { slot: "badge", variant },
   })
 }
 

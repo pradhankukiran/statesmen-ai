@@ -18,7 +18,7 @@ function PartyLabel({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 text-small text-muted-foreground",
+        "inline-flex items-center gap-1.5",
         className
       )}
     >

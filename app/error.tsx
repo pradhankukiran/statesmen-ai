@@ -21,13 +21,11 @@ export default function GlobalError({ error, reset }: Props) {
     <SiteShell>
     <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14">
       <Hero
-        eyebrow="Error"
         headline="Something tripped."
         body="An unexpected error interrupted the page. Try again — and if it sticks, head back to the homepage."
-        bodyMaxWidth="max-w-none"
       >
         {error.digest ? (
-          <p className="-mt-2 mb-6 font-mono text-label uppercase text-muted-foreground">
+          <p className="-mt-2 mb-6 font-mono text-label text-muted-foreground">
             digest: {error.digest}
           </p>
         ) : null}

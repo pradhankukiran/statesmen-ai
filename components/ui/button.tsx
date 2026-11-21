@@ -4,13 +4,13 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 // Button
-//   primary     ─ Commons green fill. One per view: the main action.
+//   primary     ─ Near-black fill. One per view: the main action.
 //   secondary   ─ White surface with a border. Alternative actions.
 //   ghost       ─ No chrome until hover. Toolbar and icon actions.
 //   destructive ─ Tinted red. Irreversible actions.
 //   link        ─ Inline text action.
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-sm font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-sm font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -20,7 +20,7 @@ const buttonVariants = cva(
         ghost: "text-foreground hover:bg-muted",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/15 focus-visible:ring-destructive/30",
-        link: "text-brand underline-offset-4 hover:underline",
+        link: "text-foreground underline underline-offset-4 hover:text-muted-foreground",
       },
       size: {
         sm: "h-8 px-3 text-small [&_svg:not([class*='size-'])]:size-3.5",

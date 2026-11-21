@@ -4,9 +4,7 @@ import { Landmark } from "lucide-react";
 import { GpuStatusDot } from "@/components/gpu-status-dot";
 import { HeaderSearch } from "@/components/header-search";
 
-// Top-of-page chrome: brand mark on the left, search in the middle, persona
-// tagline on the right (tagline collapses on narrow screens to keep search
-// from getting squeezed).
+// Top-of-page chrome: brand mark, search, and the speech-search status dot.
 export function SiteHeader() {
   return (
     <header className="border-b border-border">
@@ -28,9 +26,6 @@ export function SiteHeader() {
             <HeaderSearch />
           </div>
         </div>
-        <nav className="hidden text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-muted-foreground lg:block">
-          Hansard-grounded · AI personas
-        </nav>
         <div className="ml-1 flex shrink-0 items-center">
           <GpuStatusDot />
         </div>

@@ -15,10 +15,8 @@ export default function NotFound() {
     <SiteShell>
     <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14">
       <Hero
-        eyebrow="404"
         headline="Not in the record."
         body="This page isn't in Hansard. Or anywhere else for that matter."
-        bodyMaxWidth="max-w-none"
       >
         <Button variant="primary" size="lg" render={<Link href="/" />}>
           Back to homepage

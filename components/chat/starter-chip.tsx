@@ -18,7 +18,7 @@ export function StarterChip({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "cursor-pointer rounded-lg bg-card px-4 py-3 text-left text-small ring-1 ring-inset ring-border transition-colors hover:bg-muted hover:ring-input focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+        "cursor-pointer rounded-md bg-card px-3 py-2 text-left text-small ring-1 ring-inset ring-border transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
     >

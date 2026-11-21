@@ -19,14 +19,11 @@ export default function ProfileError({ error, reset }: Props) {
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-10 sm:py-14 lg:flex lg:h-full lg:flex-col lg:overflow-hidden">
       <Hero
-        size="lg"
-        eyebrow="Profile error"
         headline="Couldn't load that profile."
         body="The Members API didn't respond as expected. This is usually transient — try again, or pick someone else from the homepage."
-        bodyMaxWidth="max-w-none"
       >
         {error.digest ? (
-          <p className="-mt-2 mb-6 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-muted-foreground/80">
+          <p className="-mt-2 mb-6 font-mono text-label text-muted-foreground">
             digest: {error.digest}
           </p>
         ) : null}

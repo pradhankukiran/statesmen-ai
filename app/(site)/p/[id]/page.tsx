@@ -4,7 +4,6 @@ import { ViewTransition } from "react";
 import type { Metadata } from "next";
 
 import { ChatCta } from "@/components/chat-cta";
-import { Badge } from "@/components/ui/badge";
 import { PartyLabel } from "@/components/ui/party-label";
 import { getMember, getMemberPhotoUrl, type Member } from "@/lib/members";
 import {
@@ -161,7 +160,7 @@ export default async function ProfilePage({
           ) : (
             <div
               aria-hidden
-              className="flex size-full items-center justify-center bg-brand-subtle font-serif text-title text-brand"
+              className="flex size-full items-center justify-center bg-muted text-title font-medium text-muted-foreground"
             >
               {initials(profile.name)}
             </div>
@@ -170,12 +169,12 @@ export default async function ProfilePage({
 
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <div className="flex flex-col gap-2">
-            {profile.house === "Lords" && (
-              <Badge variant="lords">House of Lords</Badge>
-            )}
-            <h1 className="font-heading text-title font-medium">{profile.name}</h1>
-            <PartyLabel party={profile.party} color={profile.partyColor} />
-            {meta && <p className="text-small text-muted-foreground">{meta}</p>}
+            <h1 className="text-title font-semibold tracking-tight">{profile.name}</h1>
+            <div className="flex flex-wrap items-center gap-1.5 text-small text-muted-foreground">
+              <PartyLabel party={profile.party} color={profile.partyColor} />
+              {meta && <span aria-hidden>·</span>}
+              {meta && <span>{meta}</span>}
+            </div>
             {profile.fullTitle && profile.fullTitle !== profile.name && (
               <p className="text-small text-muted-foreground">{profile.fullTitle}</p>
             )}

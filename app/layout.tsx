@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Newsreader } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -10,15 +10,6 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
-});
-
-// Serif for names, headings and quotes. Variable font with an optical-size
-// axis, so large headings get display cuts and small quotes text cuts.
-const newsreader = Newsreader({
-  variable: "--font-newsreader",
-  subsets: ["latin"],
-  axes: ["opsz"],
-  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -35,7 +26,7 @@ export default function RootLayout({
   return (
     <html
       lang="en-GB"
-      className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       {/* Page chrome lives in the route-group layouts: (site) for browsing,
           (chat) for the full-screen chat. */}

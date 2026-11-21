@@ -21,34 +21,28 @@ export const metadata: Metadata = {
 };
 
 const COLOURS = [
-  { name: "Paper", token: "background", hex: "#faf8f3", className: "bg-background" },
-  { name: "Ink", token: "foreground", hex: "#1c1b18", className: "bg-foreground" },
-  { name: "Card", token: "card", hex: "#ffffff", className: "bg-card" },
-  { name: "Muted", token: "muted", hex: "#f1eee6", className: "bg-muted" },
-  { name: "Muted text", token: "muted-foreground", hex: "#5f5b52", className: "bg-muted-foreground" },
-  { name: "Border", token: "border", hex: "#e3ded3", className: "bg-border" },
-  { name: "Input", token: "input", hex: "#d6d0c3", className: "bg-input" },
-  { name: "Commons green", token: "brand", hex: "#006548", className: "bg-brand" },
-  { name: "Green hover", token: "brand-hover", hex: "#00513a", className: "bg-brand-hover" },
-  { name: "Green tint", token: "brand-subtle", hex: "#e5f0eb", className: "bg-brand-subtle" },
-  { name: "Lords red", token: "lords", hex: "#b50938", className: "bg-lords" },
+  { name: "Background", token: "background", hex: "#ffffff", className: "bg-background" },
+  { name: "Text", token: "foreground", hex: "#18181b", className: "bg-foreground" },
+  { name: "Muted", token: "muted", hex: "#f4f4f5", className: "bg-muted" },
+  { name: "Muted text", token: "muted-foreground", hex: "#63636b", className: "bg-muted-foreground" },
+  { name: "Border", token: "border", hex: "#e4e4e7", className: "bg-border" },
+  { name: "Input", token: "input", hex: "#d4d4d8", className: "bg-input" },
+  { name: "Primary", token: "brand", hex: "#18181b", className: "bg-brand" },
   { name: "Error", token: "destructive", hex: "#b42318", className: "bg-destructive" },
 ];
 
 const TYPE = [
-  { name: "display", className: "font-heading text-display font-medium", sample: "Chat with the voices of British politics" },
-  { name: "title", className: "font-heading text-title font-medium", sample: "Gordon Brown" },
-  { name: "heading", className: "font-heading text-heading font-medium", sample: "Popular Prime Ministers" },
-  { name: "subheading", className: "text-subheading", sample: "Built from their real recorded speeches." },
+  { name: "title", className: "text-title font-semibold tracking-tight", sample: "Chat with British politicians" },
+  { name: "heading", className: "text-heading font-semibold", sample: "Prime Ministers" },
   { name: "body", className: "text-body", sample: "We faced a global banking crisis, and we had to deal with it decisively." },
-  { name: "small", className: "text-small", sample: "Commons · 2007–2010" },
-  { name: "label (eyebrow)", className: "eyebrow", sample: "Begin conversation" },
+  { name: "small", className: "text-small text-muted-foreground", sample: "Labour · 2007–2010" },
+  { name: "label", className: "text-label text-muted-foreground", sample: "17 November 2008 · G20 Summit" },
 ];
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-5 border-t border-border pt-8">
-      <h2 className="font-heading text-heading font-medium">{title}</h2>
+      <h2 className="text-heading font-semibold">{title}</h2>
       {children}
     </section>
   );
@@ -58,16 +52,15 @@ export default function DesignPage() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-6 py-12 lg:h-full lg:overflow-y-auto">
       <Hero
-        eyebrow="Design system"
-        headline={<>Hansard <Hero.Highlight>editorial</Hero.Highlight></>}
-        body="Paper, ink and House of Commons green. Serif for names and quotes, sans for the interface. Every screen is built from the pieces on this page."
+        headline="Design system"
+        body="Plain and functional: white, near-black, neutral greys, one sans font. Every screen is built from the pieces on this page."
       />
 
       <Section title="Colour">
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {COLOURS.map((c) => (
             <li key={c.token} className="overflow-hidden rounded-lg bg-card ring-1 ring-border">
-              <div className={`h-16 ${c.className} border-b border-border`} />
+              <div className={`h-12 ${c.className} border-b border-border`} />
               <div className="p-3">
                 <div className="text-small font-medium">{c.name}</div>
                 <div className="font-mono text-label text-muted-foreground">
@@ -87,12 +80,6 @@ export default function DesignPage() {
               <span className={t.className}>{t.sample}</span>
             </li>
           ))}
-          <li className="grid gap-1 sm:grid-cols-[9rem_1fr] sm:items-baseline">
-            <code className="font-mono text-label text-muted-foreground">quote</code>
-            <blockquote className="border-l-2 border-brand pl-3 font-serif text-subheading italic">
-              Let us be honest: some of these banks would not be in existence today.
-            </blockquote>
-          </li>
         </ul>
       </Section>
 
@@ -114,13 +101,11 @@ export default function DesignPage() {
 
       <Section title="Badges and labels">
         <div className="flex flex-wrap items-center gap-3">
-          <Badge variant="accent">Begin conversation</Badge>
           <Badge variant="neutral">500 speeches</Badge>
           <Badge variant="outline">Commons</Badge>
-          <Badge variant="lords">House of Lords</Badge>
           <Badge variant="destructive">Failed</Badge>
         </div>
-        <div className="flex flex-wrap items-center gap-5">
+        <div className="flex flex-wrap items-center gap-5 text-small text-muted-foreground">
           <PartyLabel party="Labour" color="#d50000" />
           <PartyLabel party="Conservative" color="#0063ba" />
           <PartyLabel party="Liberal Democrat" color="#faa61a" />
@@ -153,9 +138,7 @@ export default function DesignPage() {
             name="Boris Johnson"
             party="Conservative"
             partyColor="#0063ba"
-            house="Commons"
             term="2019–2022"
-            tagline="Brexit-era PM"
             href="/design"
           />
           <PersonCard
@@ -163,9 +146,7 @@ export default function DesignPage() {
             name="Gordon Brown"
             party="Labour"
             partyColor="#d50000"
-            house="Commons"
             term="2007–2010"
-            tagline="Crisis-era PM"
             photoUrl={null}
             href="/design"
           />
@@ -174,7 +155,7 @@ export default function DesignPage() {
 
       <Section title="Chat">
         <div className="flex max-w-2xl flex-col gap-6 rounded-lg bg-background p-4 ring-1 ring-border">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-1.5">
             <StarterChip>How did you handle the 2008 banking crisis?</StarterChip>
             <StarterChip>What did you make of the G20 summit?</StarterChip>
           </div>
