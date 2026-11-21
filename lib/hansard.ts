@@ -247,3 +247,23 @@ export async function* iterateContributions(
     page += waveSize;
   }
 }
+
+/**
+ * Link to a debate on hansard.parliament.uk:
+ *   /{House}/{YYYY-MM-DD}/debates/{DebateSectionExtId}/{TitleWithoutSpaces}
+ * The title part mirrors Hansard's own URLs (e.g. "G20Summit").
+ */
+export function hansardDebateUrl(
+  house: string,
+  date: string,
+  debateSectionExtId: string | null,
+  title: string | null,
+): string | null {
+  if (!debateSectionExtId) return null;
+  const slug = (title ?? "").replace(/[^A-Za-z0-9]/g, "");
+  return (
+    `https://hansard.parliament.uk/${encodeURIComponent(house)}/${date.slice(0, 10)}` +
+    `/debates/${encodeURIComponent(debateSectionExtId)}` +
+    (slug ? `/${slug}` : "")
+  );
+}

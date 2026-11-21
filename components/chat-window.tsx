@@ -9,11 +9,17 @@ import remarkGfm from "remark-gfm";
 
 import { Composer } from "@/components/chat/composer";
 import { PersonaMessage, UserMessage } from "@/components/chat/message";
+import { SourceCard } from "@/components/chat/source-card";
 import { StarterChip } from "@/components/chat/starter-chip";
 import { GpuStatusDot } from "@/components/gpu-status-dot";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { BackLink, ErrorSummary } from "@/components/ui/govuk";
+import { BackLink, Details, ErrorSummary } from "@/components/ui/govuk";
+import {
+  formatSourceDate,
+  type ChatMetadata,
+  type ReplySource,
+} from "@/lib/chat-sources";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,7 +34,9 @@ type Props = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function messageText(message: UIMessage): string {
+type ChatMessage = UIMessage<ChatMetadata>;
+
+function messageText(message: ChatMessage): string {
   return message.parts
     .filter((p): p is { type: "text"; text: string } => p.type === "text")
     .map((p) => p.text)
@@ -82,7 +90,7 @@ export function ChatWindow({ slug, name, photoUrl, subtitle, suggestedStarters }
     [slug],
   );
   const { messages, sendMessage, setMessages, status, error, regenerate, stop } =
-    useChat({ transport });
+    useChat<ChatMessage>({ transport });
 
   const isBusy = status === "submitted" || status === "streaming";
   const hasMessages = messages.length > 0;
@@ -184,6 +192,9 @@ export function ChatWindow({ slug, name, photoUrl, subtitle, suggestedStarters }
                       pending={text.length === 0 && isBusy}
                     >
                       <ReplyMarkdown text={text} />
+                      {text.length > 0 && (
+                        <ReplySources sources={message.metadata?.sources} />
+                      )}
                     </PersonaMessage>
                   </li>
                 );
@@ -241,6 +252,32 @@ export function ChatWindow({ slug, name, photoUrl, subtitle, suggestedStarters }
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Sources ──────────────────────────────────────────────────────────────────
+
+/** The Hansard speeches a reply drew on, behind a GOV.UK details toggle. */
+function ReplySources({ sources }: { sources?: ReplySource[] }) {
+  if (!sources || sources.length === 0) return null;
+  return (
+    <Details
+      summary={`Speeches used for this answer (${sources.length})`}
+      className="mt-4 text-small"
+    >
+      <ol className="flex flex-col gap-5">
+        {sources.map((s) => (
+          <li key={s.id}>
+            <SourceCard
+              date={formatSourceDate(s.date)}
+              debate={s.debate}
+              excerpt={s.excerpt}
+              href={s.url}
+            />
+          </li>
+        ))}
+      </ol>
+    </Details>
   );
 }
 

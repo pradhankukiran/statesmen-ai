@@ -16,6 +16,8 @@ import {
 } from "ai";
 import { chatModel } from "@/lib/models";
 import { recordEmbedActivity } from "@/lib/warmup-state";
+import { excerptOf, type ChatMetadata, type ReplySource } from "@/lib/chat-sources";
+import { hansardDebateUrl } from "@/lib/hansard";
 import { getPersonCached } from "@/lib/person-cache";
 import { searchSpeeches, type StoredPerson } from "@/lib/speeches";
 import {
@@ -283,5 +285,17 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  return result.toUIMessageStreamResponse();
+  // The speeches behind this reply, shown under it in the chat.
+  const sources: ReplySource[] = speeches.map((s) => ({
+    id: s.id,
+    date: s.sittingDate,
+    house: s.house,
+    debate: s.debateTitle?.trim() || null,
+    url: hansardDebateUrl(s.house, s.sittingDate, s.debateSectionExtId, s.debateTitle),
+    excerpt: excerptOf(s.text),
+  }));
+
+  return result.toUIMessageStreamResponse<UIMessage<ChatMetadata>>({
+    messageMetadata: ({ part }) => (part.type === "start" ? { sources } : undefined),
+  });
 }
