@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import { ChatWindow } from "@/components/chat-window";
-import { getPersona } from "@/lib/cache";
+import { getPerson } from "@/lib/speeches";
 import { getMemberPhotoUrl } from "@/lib/members";
 import { getPopularPMBySlug } from "@/lib/popular";
 
@@ -25,11 +25,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const cached = await getPersona(slug);
-    if (cached === null) return { title: "Chat — Statesmen AI" };
+    const person = await getPerson(slug);
+    if (person === null) return { title: "Chat — Statesmen AI" };
     return {
-      title: `Chat with ${cached.meta.name} — Statesmen AI`,
-      description: `An AI persona of ${cached.meta.name}, grounded in real Hansard speeches.`,
+      title: `Chat with ${person.name} — Statesmen AI`,
+      description: `An AI persona of ${person.name}, grounded in real Hansard speeches.`,
     };
   } catch {
     return { title: "Chat — Statesmen AI" };
@@ -45,22 +45,21 @@ export default async function ChatPage({
 }) {
   const { slug } = await params;
 
-  const cached = await getPersona(slug);
-  if (cached === null) {
+  const person = await getPerson(slug);
+  if (person === null) {
     // The user shouldn't reach this page without a built persona; bounce to home.
     redirect("/");
   }
 
-  const { meta } = cached;
   // Photo source preference for the chat header avatar:
-  //   1. The persona's own `meta.memberId` (modern PMs).
+  //   1. The person's own `memberId` (modern PMs).
   //   2. The `photoMemberId` recorded in popular-pms.json for historical
   //      figures (e.g. Thatcher's Lords-era id 953).
   //   3. Undefined → the avatar falls back to initials.
   const popular = getPopularPMBySlug(slug);
   const photoMemberId =
-    typeof meta.memberId === "number"
-      ? meta.memberId
+    person.memberId !== null
+      ? person.memberId
       : popular?.kind === "attribution" && popular.photoMemberId !== undefined
         ? popular.photoMemberId
         : null;
@@ -70,9 +69,9 @@ export default async function ChatPage({
   return (
     <ChatWindow
       slug={slug}
-      name={meta.name}
+      name={person.name}
       photoUrl={photoUrl}
-      suggestedStarters={suggestedStartersFor(meta.name)}
+      suggestedStarters={suggestedStartersFor(person.name)}
     />
   );
 }

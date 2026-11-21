@@ -1,10 +1,10 @@
 /**
  * Streaming chat endpoint.
  *
- * Loads a cached persona by slug, builds a system prompt from `persona.md`
- * plus a randomly-sampled few-shot block of verbatim quotes, and streams a
- * Groq Llama response in the persona's voice. Designed to pair with the
- * Vercel AI SDK `useChat` hook on the client.
+ * Loads the person from Neon, finds their speeches closest in meaning to the
+ * latest question (embedding search), builds a system prompt around those
+ * speeches, and streams a Groq response in the persona's voice. Designed to
+ * pair with the Vercel AI SDK `useChat` hook on the client.
  */
 
 import { groq } from "@ai-sdk/groq";
@@ -14,8 +14,12 @@ import {
   type UIMessage,
 } from "ai";
 import { chatModel } from "@/lib/models";
-import { getPersona, type CachedPersona } from "@/lib/cache";
-import type { PersonaExamplesFile } from "@/lib/persona";
+import { getPerson, searchSpeeches, type StoredPerson } from "@/lib/speeches";
+import {
+  buildChatSystemPrompt,
+  retrievalQuery,
+  SPEECHES_PER_MESSAGE,
+} from "@/lib/chat-prompt";
 
 export const runtime = "nodejs";
 // Streaming Groq replies are typically a few seconds, but we leave headroom
@@ -104,52 +108,6 @@ function isChatRequestBody(value: unknown): value is ChatRequestBody {
   return v.messages.every((m, i) => validateMessage(m, i) === null);
 }
 
-// ─── System prompt assembly ──────────────────────────────────────────────────
-
-const EXAMPLE_COUNT = 8;
-
-/**
- * Behavioural reinforcement appended to the rendered persona.md. Belt-and-
- * braces over the Behaviour block already in the persona, restated near the
- * conversation boundary so it's the freshest instruction the model sees
- * before generation. Also a soft-stop against the truncation issue: we'd
- * rather the model wrap up cleanly than bump the maxOutputTokens ceiling.
- */
-const SYSTEM_PROMPT_REINFORCEMENT =
-  "Keep replies focused and concise — typical chamber length, not essays. " +
-  "If you find yourself running long, conclude cleanly rather than trailing off.";
-
-function sampleExamples(
-  examples: PersonaExamplesFile,
-  count: number,
-): string[] {
-  const pool = examples.examples;
-  if (pool.length <= count) return [...pool];
-  // Fisher–Yates partial shuffle: produce `count` distinct random picks.
-  const copy = [...pool];
-  for (let i = 0; i < count; i++) {
-    const j = i + Math.floor(Math.random() * (copy.length - i));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy.slice(0, count);
-}
-
-function buildSystemPrompt(cached: CachedPersona): string {
-  const sampled = sampleExamples(cached.examples, EXAMPLE_COUNT);
-  const base =
-    sampled.length === 0
-      ? cached.md
-      : `${cached.md}
-
-## Real examples of how you speak
-${sampled.map((q) => `- "${q}"`).join("\n")}
-`;
-
-  return `${base}
-${SYSTEM_PROMPT_REINFORCEMENT}
-`;
-}
-
 // ─── Route ───────────────────────────────────────────────────────────────────
 
 export async function POST(request: Request): Promise<Response> {
@@ -235,37 +193,46 @@ export async function POST(request: Request): Promise<Response> {
 
   const { slug, messages } = body;
 
-  let cached: CachedPersona | null;
+  let person: StoredPerson | null;
   try {
-    cached = await getPersona(slug);
+    person = await getPerson(slug);
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Unknown cache error.";
+    const message = err instanceof Error ? err.message : "Unknown database error.";
     return Response.json(
       { error: `Persona load failed: ${message}` },
       { status: 502 },
     );
   }
 
-  if (cached === null) {
+  if (person === null) {
     return Response.json(
       { error: "Persona not built yet" },
       { status: 404 },
     );
   }
 
-  // Defensive: a corrupted artefact (empty md) would silently produce a
-  // persona-less assistant, which would happily answer prompt-injection
-  // questions. Upstream MIN_CONTRIBUTIONS=20 should prevent this; bounce
-  // it loudly if it ever slips through.
-  if (cached.md.trim().length === 0) {
+  // Without speeches the reply would be a generic model, not the persona, so
+  // a search failure is surfaced rather than papered over.
+  const query = retrievalQuery(
+    messages.filter((m) => m.role === "user").map((m) => messageText(m as unknown as Record<string, unknown>)),
+  );
+  let speeches;
+  try {
+    speeches = await searchSpeeches(slug, query, SPEECHES_PER_MESSAGE, {
+      signal: request.signal,
+    });
+  } catch (err) {
+    console.error(
+      "[chat] speech search failed:",
+      err instanceof Error ? err.message : err,
+    );
     return Response.json(
-      { error: "Persona artefact is corrupted." },
-      { status: 502 },
+      { error: "Speech search is unavailable. Please try again." },
+      { status: 503 },
     );
   }
 
-  const system = buildSystemPrompt(cached);
+  const system = buildChatSystemPrompt(person, speeches);
   const model = groq(chatModel());
 
   const modelMessages = await convertToModelMessages(messages);

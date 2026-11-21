@@ -1,10 +1,9 @@
-import { getPersona, hasPersona } from "@/lib/cache";
-import type { PersonaMeta } from "@/lib/persona";
+import { getPerson, type StoredPerson } from "@/lib/speeches";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type StatusResponse =
-  | { status: "ready"; meta: PersonaMeta }
+  | { status: "ready"; person: StoredPerson }
   | { status: "missing" };
 
 // ─── Route ────────────────────────────────────────────────────────────────────
@@ -21,19 +20,9 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    if (!(await hasPersona(slug))) {
-      const body: StatusResponse = { status: "missing" };
-      return Response.json(body, { status: 200 });
-    }
-
-    const cached = await getPersona(slug);
-    if (cached === null) {
-      // Race: artefacts vanished between the existence check and the read.
-      const body: StatusResponse = { status: "missing" };
-      return Response.json(body, { status: 200 });
-    }
-
-    const body: StatusResponse = { status: "ready", meta: cached.meta };
+    const person = await getPerson(slug);
+    const body: StatusResponse =
+      person === null ? { status: "missing" } : { status: "ready", person };
     return Response.json(body, { status: 200 });
   } catch (err) {
     const message =

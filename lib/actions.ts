@@ -14,13 +14,12 @@
  * action below is purely the in-app idiomatic path.
  */
 
-import { getPersona, hasPersona } from "@/lib/cache";
-import type { PersonaMeta } from "@/lib/persona";
+import { getPerson, type StoredPerson } from "@/lib/speeches";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type PersonaStatusResult =
-  | { status: "ready"; meta: PersonaMeta }
+  | { status: "ready"; person: StoredPerson }
   | { status: "missing" }
   | { status: "error"; message: string };
 
@@ -36,7 +35,7 @@ const MAX_SLUG_LENGTH = 200;
  * Mirrors the HTTP route's behaviour:
  *   - missing/blank/over-length slug → `{ status: "error", ... }`
  *   - cache miss                     → `{ status: "missing" }`
- *   - cache hit                      → `{ status: "ready", meta }`
+ *   - cache hit                      → `{ status: "ready", person }`
  *   - upstream cache failure         → `{ status: "error", ... }`
  *
  * Note: errors are returned (not thrown) so the calling `useActionState`
@@ -63,15 +62,9 @@ export async function checkPersonaStatusAction(
   }
 
   try {
-    if (!(await hasPersona(trimmed))) {
-      return { status: "missing" };
-    }
-    const cached = await getPersona(trimmed);
-    if (cached === null) {
-      // Race: artefacts vanished between the existence check and the read.
-      return { status: "missing" };
-    }
-    return { status: "ready", meta: cached.meta };
+    const person = await getPerson(trimmed);
+    if (person === null) return { status: "missing" };
+    return { status: "ready", person };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown cache error.";
     return {
